@@ -1,6 +1,6 @@
 import { Ride, User, Vehicle } from "@shared/schema";
 import { format } from "date-fns";
-import { MapPin, Clock, Users, ChevronRight } from "lucide-react";
+import { MapPin, Clock, Users, ChevronRight, Calendar } from "lucide-react";
 import { Link } from "wouter";
 
 interface RideCardProps {
