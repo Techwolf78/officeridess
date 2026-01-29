@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Layout } from "@/components/ui/Layout";
 import { useCreateRide } from "@/hooks/use-rides";
 import { useVehicles } from "@/hooks/use-vehicles";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, MapPin, Calendar, DollarSign, Users, Car } from "lucide-react";
 

@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, boolean, timestamp, decimal } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -59,6 +60,35 @@ export const ratings = pgTable("ratings", {
   comment: text("comment"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// === RELATIONS ===
+
+export const usersRelations = relations(users, ({ many }) => ({
+  vehicles: many(vehicles),
+  ridesAsDriver: many(rides),
+  bookings: many(bookings),
+}));
+
+export const vehiclesRelations = relations(vehicles, ({ one }) => ({
+  owner: one(users, { fields: [vehicles.userId], references: [users.id] }),
+}));
+
+export const ridesRelations = relations(rides, ({ one, many }) => ({
+  driver: one(users, { fields: [rides.driverId], references: [users.id] }),
+  vehicle: one(vehicles, { fields: [rides.vehicleId], references: [vehicles.id] }),
+  bookings: many(bookings),
+}));
+
+export const bookingsRelations = relations(bookings, ({ one }) => ({
+  ride: one(rides, { fields: [bookings.rideId], references: [rides.id] }),
+  passenger: one(users, { fields: [bookings.passengerId], references: [users.id] }),
+}));
+
+export const ratingsRelations = relations(ratings, ({ one }) => ({
+  ride: one(rides, { fields: [ratings.rideId], references: [rides.id] }),
+  fromUser: one(users, { fields: [ratings.fromUserId], references: [users.id] }),
+  toUser: one(users, { fields: [ratings.toUserId], references: [users.id] }),
+}));
 
 // === SCHEMAS ===
 
