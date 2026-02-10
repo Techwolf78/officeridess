@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read and write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Rides can be read by anyone, but only created/updated by the driver
+    match /rides/{rideId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == resource.data.driverId;
+      allow update: if request.auth != null && request.auth.uid == resource.data.driverId;
+    }
+
+    // Bookings can be read by the passenger and driver, created by passenger
+    match /bookings/{bookingId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.passengerId ||
+        request.auth.uid == get(/databases/$(database)/documents/rides/$(resource.data.rideId)).data.driverId
+      );
+      allow create: if request.auth != null && request.auth.uid == resource.data.passengerId;
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.passengerId ||
+        request.auth.uid == get(/databases/$(database)/documents/rides/$(resource.data.rideId)).data.driverId
+      );
+    }
+
+    // Vehicles can only be accessed by their owner
+    match /vehicles/{vehicleId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // Ratings can be read by anyone, created by the reviewer
+    match /ratings/{ratingId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == resource.data.fromUserId;
+    }
+
+    // Chat access - only participants can read/write
+    match /chats/{chatId} {
+      allow read, write: if request.auth != null &&
+        request.auth.uid in resource.data.participants;
+    }
+
+    // Messages - only participants can read/write
+    match /messages/{messageId} {
+      allow read, write: if request.auth != null &&
+        request.auth.uid in get(/databases/$(database)/documents/chats/$(resource.data.chatId)).data.participants;
+    }
+  }
+}

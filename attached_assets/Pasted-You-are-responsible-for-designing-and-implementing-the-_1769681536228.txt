@@ -1,0 +1,227 @@
+You are responsible for designing and implementing the COMPLETE UI of an Office Commute Carpooling Platform (cost-sharing only, not a taxi app). This is a UI-only product using dummy data and localStorage.
+
+1. Core Responsibilities (Non-Negotiable)
+
+You must fully manage and implement:
+
+Complete UI/UX design
+
+Component structure
+
+Screen navigation
+
+State management using localStorage
+
+Dummy data creation and lifecycle
+
+Validation, error handling, and success flows
+
+Loading, empty, error, and success states
+
+Toast notifications for every user action
+
+No backend. No assumptions. No unresolved placeholders.
+
+2. Application Areas You Must Fully Handle
+Authentication & Access
+
+Login using phone number
+
+OTP verification (dummy OTP logic)
+
+Session persistence using localStorage
+
+Logout and session clearing
+
+User Profile
+
+Mandatory profile completion flow
+
+Profile edit
+
+Profile photo handling (UI-only)
+
+Home & office location selection (mock/map placeholder)
+
+Role Handling
+
+Passenger role
+
+Driver role (upgrade flow)
+
+Conditional UI based on role
+
+Driver-only and passenger-only actions
+
+Ride Lifecycle (UI-Level)
+
+Ride creation
+
+Ride listing
+
+Ride discovery
+
+Ride booking
+
+Ride cancellation
+
+Ride completion
+
+Ride history
+
+Booking Management
+
+Upcoming bookings
+
+Completed bookings
+
+Cancelled bookings
+
+Booking status transitions
+
+Payments (Simulated)
+
+Payment method selection
+
+Cost breakdown display
+
+Success/failure simulation
+
+Wallet-like booking records
+
+Ratings & Feedback
+
+Mandatory post-ride rating
+
+Optional comments
+
+Rating visibility in UI
+
+3. UI Behavior You Must Decide & Implement
+
+You must explicitly manage:
+
+Button enabled/disabled states
+
+Input validation rules
+
+Navigation after every action
+
+Toast messages (success, error, warning)
+
+Position, color, and duration of toasts
+
+Empty state messages/illustrations
+
+Skeleton loaders while data loads
+
+Error states for invalid or blocked actions
+
+No UI interaction should feel incomplete.
+
+4. Data Management Rules
+
+You must:
+
+Store all data in localStorage
+
+Create realistic dummy data for:
+
+Users
+
+Drivers
+
+Vehicles
+
+Rides
+
+Bookings
+
+Ratings
+
+Persist data across refresh
+
+Clear all data on logout
+
+No external APIs.
+
+5. UI & Design Constraints (MANDATORY)
+
+Framework: React
+
+Styling: Tailwind CSS
+
+Routing: React Router
+
+Icons: Lucide Icons (or equivalent)
+
+Color System (STRICT)
+
+Primary Color: #15803D
+
+Secondary Color: #FAF9F4
+
+Text on Primary Background: #FFFFFF (White)
+
+Text on Secondary Background: #000000 (Black)
+
+Use the primary color for:
+
+Primary buttons
+
+Key CTAs
+
+Active states
+
+Use the secondary color for:
+
+Page backgrounds
+
+Cards
+
+Containers
+
+Design Style
+
+Corporate
+
+Clean
+
+Trustworthy
+
+Minimal
+
+Investor-ready
+
+Minimum font size: 14px
+No clutter. No experimental visuals.
+
+6. Platform Rules You Must Enforce in UI
+
+No taxi or cab terminology
+
+No surge pricing
+
+No cash payments
+
+No profit messaging for drivers
+
+Cost-sharing language only
+
+Office-commute use cases only
+
+7. Quality Bar
+
+The final UI must:
+
+Feel like a real production SaaS product
+
+Be demo-ready for investors
+
+Be usable without explanation
+
+Contain no dead ends or broken flows
+
+Function fully using dummy data only
+
+You are expected to make all reasonable UI decisions within this scope and deliver a complete, cohesive, working frontend experience.
