@@ -1,66 +1,111 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type LoginRequest } from "@shared/routes";
+import { useState, useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { signInWithPhoneNumber, signOut, onAuthStateChanged, User, RecaptchaVerifier } from "firebase/auth";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { FirebaseUser, LoginRequest, VerifyOtpRequest, UpdateProfileRequest } from "@/lib/types";
 import { useLocation } from "wouter";
 
 export function useAuth() {
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
-  const { data: user, isLoading, error } = useQuery({
-    queryKey: [api.auth.me.path],
-    queryFn: async () => {
-      const res = await fetch(api.auth.me.path);
-      if (res.status === 401) return null;
-      if (!res.ok) throw new Error("Failed to fetch user");
-      return api.auth.me.responses[200].parse(await res.json());
-    },
-    retry: false,
-  });
+  // Initialize reCAPTCHA verifier
+  useEffect(() => {
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+      });
+    }
+  }, []);
+
+  // Listen to auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Fetch additional user data from Firestore
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as Omit<FirebaseUser, 'uid'>;
+          setUser({ uid: firebaseUser.uid, ...userData });
+        } else {
+          // Create new user document if it doesn't exist
+          const newUser: FirebaseUser = {
+            uid: firebaseUser.uid,
+            phoneNumber: firebaseUser.phoneNumber || '',
+            fullName: '',
+            role: 'passenger',
+            isDriverVerified: false,
+            walletBalance: 10000, // $100 in cents
+            createdAt: new Date(),
+          };
+          await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+          setUser(newUser);
+        }
+      } else {
+        setUser(null);
+      }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginRequest) => {
-      const res = await fetch(api.auth.login.path, {
-        method: api.auth.login.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Login failed");
-      return api.auth.login.responses[200].parse(await res.json());
+      const confirmation = await signInWithPhoneNumber(auth, data.phoneNumber, window.recaptchaVerifier);
+      setConfirmationResult(confirmation);
+      return { success: true, message: "OTP sent" };
     },
   });
 
   const verifyMutation = useMutation({
-    mutationFn: async (data: { phoneNumber: string; otp: string }) => {
-      const res = await fetch(api.auth.verify.path, {
-        method: api.auth.verify.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Verification failed");
-      return api.auth.verify.responses[200].parse(await res.json());
+    mutationFn: async (data: VerifyOtpRequest) => {
+      const result = await data.confirmationResult.confirm(data.otp);
+      return result.user;
     },
-    onSuccess: (user) => {
-      queryClient.setQueryData([api.auth.me.path], user);
+    onSuccess: () => {
       setLocation("/");
     },
   });
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await fetch(api.auth.logout.path, { method: api.auth.logout.method });
+      await signOut(auth);
+      setConfirmationResult(null);
     },
     onSuccess: () => {
-      queryClient.setQueryData([api.auth.me.path], null);
       setLocation("/login");
+    },
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: UpdateProfileRequest) => {
+      if (!user) throw new Error("Not authenticated");
+
+      const updateData = { ...data };
+      delete (updateData as any).uid; // Remove uid if present
+      delete (updateData as any).createdAt; // Remove createdAt if present
+
+      await updateDoc(doc(db, 'users', user.uid), updateData);
+
+      // Update local state
+      setUser(prev => prev ? { ...prev, ...updateData } : null);
+      return { success: true };
     },
   });
 
   return {
     user,
     isLoading,
-    error,
+    error: null, // Firebase handles errors through mutations
+    confirmationResult,
     login: loginMutation,
     verify: verifyMutation,
     logout: logoutMutation,
+    updateProfile: updateProfileMutation,
   };
 }

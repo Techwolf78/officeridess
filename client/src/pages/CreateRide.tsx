@@ -1,20 +1,23 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertRideSchema } from "@shared/schema";
 import { z } from "zod";
 import { Layout } from "@/components/ui/Layout";
 import { useCreateRide } from "@/hooks/use-rides";
 import { useVehicles } from "@/hooks/use-vehicles";
+import { useAuth } from "@/hooks/use-auth";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, MapPin, Calendar, DollarSign, Users, Car } from "lucide-react";
+import { CreateRideRequest } from "@/lib/types";
 
 // Client-side schema adjustment: string dates from input[type="datetime-local"] need coercion
-const createRideFormSchema = insertRideSchema.omit({ driverId: true }).extend({
+const createRideFormSchema = z.object({
+  vehicleId: z.string(),
+  origin: z.string().min(1, "Origin is required"),
+  destination: z.string().min(1, "Destination is required"),
   departureTime: z.string().transform((str) => new Date(str)),
-  vehicleId: z.coerce.number(),
-  pricePerSeat: z.coerce.number(), // Input is dollars, we'll multiply by 100
-  totalSeats: z.coerce.number(),
+  totalSeats: z.coerce.number().min(1, "At least 1 seat required"),
+  pricePerSeat: z.coerce.number().min(0, "Price must be positive"),
 });
 
 type CreateRideForm = z.infer<typeof createRideFormSchema>;
@@ -22,6 +25,7 @@ type CreateRideForm = z.infer<typeof createRideFormSchema>;
 export default function CreateRide() {
   const { mutate: createRide, isPending } = useCreateRide();
   const { data: vehicles, isLoading: loadingVehicles } = useVehicles();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -34,10 +38,21 @@ export default function CreateRide() {
   });
 
   const onSubmit = (data: CreateRideForm) => {
-    // Convert dollars to cents for backend
-    const submissionData = {
-      ...data,
-      pricePerSeat: Math.round(data.pricePerSeat * 100),
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in", variant: "destructive" });
+      return;
+    }
+
+    // Convert dollars to cents for storage
+    const submissionData: CreateRideRequest = {
+      driverId: user.uid,
+      vehicleId: data.vehicleId,
+      origin: data.origin,
+      destination: data.destination,
+      departureTime: data.departureTime,
+      totalSeats: data.totalSeats,
+      pricePerSeat: Math.round(data.pricePerSeat * 100), // Convert to cents
+      status: "scheduled",
     };
 
     createRide(submissionData, {
@@ -47,7 +62,7 @@ export default function CreateRide() {
           description: "Passengers can now book your ride.",
           className: "bg-green-50 border-green-200 text-green-900",
         });
-        setLocation("/rides");
+        setLocation("/my-rides");
       },
       onError: (err) => {
         toast({

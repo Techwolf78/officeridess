@@ -1,33 +1,92 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl, type CreateRideRequest } from "@shared/routes";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  getDocs,
+  doc,
+  getDoc,
+  addDoc,
+  updateDoc,
+  Timestamp
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { FirebaseRide, CreateRideRequest } from "@/lib/types";
 
 export function useRides(filters?: { origin?: string; destination?: string; date?: string }) {
-  // Construct query string for key consistency
-  const queryString = new URLSearchParams(filters as Record<string, string>).toString();
-  const queryKey = [api.rides.list.path, queryString];
+  const queryKey = ["rides", filters];
 
   return useQuery({
     queryKey,
     queryFn: async () => {
-      const url = filters 
-        ? `${api.rides.list.path}?${queryString}`
-        : api.rides.list.path;
-      
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch rides");
-      return api.rides.list.responses[200].parse(await res.json());
+      let q = query(collection(db, "rides"), orderBy("departureTime", "desc"));
+
+      // Apply filters if provided
+      if (filters?.origin) {
+        q = query(q, where("origin", "==", filters.origin));
+      }
+      if (filters?.destination) {
+        q = query(q, where("destination", "==", filters.destination));
+      }
+      if (filters?.date) {
+        // For date filtering, we might need to handle date ranges
+        const filterDate = new Date(filters.date);
+        const startOfDay = new Date(filterDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(filterDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        q = query(q, where("departureTime", ">=", Timestamp.fromDate(startOfDay)));
+        q = query(q, where("departureTime", "<=", Timestamp.fromDate(endOfDay)));
+      }
+
+      const querySnapshot = await getDocs(q);
+      const rides: FirebaseRide[] = [];
+
+      for (const docSnap of querySnapshot.docs) {
+        const rideData = docSnap.data();
+        const driverDoc = await getDoc(doc(db, "users", rideData.driverId));
+        const vehicleDoc = await getDoc(doc(db, "vehicles", rideData.vehicleId));
+
+        rides.push({
+          id: docSnap.id,
+          ...rideData,
+          departureTime: rideData.departureTime.toDate(),
+          createdAt: rideData.createdAt.toDate(),
+          driver: driverDoc.exists() ? { uid: driverDoc.id, ...driverDoc.data() } : undefined,
+          vehicle: vehicleDoc.exists() ? { id: vehicleDoc.id, ...vehicleDoc.data() } : undefined,
+        } as FirebaseRide);
+      }
+
+      return rides;
     },
   });
 }
 
-export function useRide(id: number) {
+export function useRide(id: string) {
   return useQuery({
-    queryKey: [api.rides.get.path, id],
+    queryKey: ["ride", id],
     queryFn: async () => {
-      const url = buildUrl(api.rides.get.path, { id });
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch ride");
-      return api.rides.get.responses[200].parse(await res.json());
+      const docRef = doc(db, "rides", id);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        throw new Error("Ride not found");
+      }
+
+      const rideData = docSnap.data();
+      const driverDoc = await getDoc(doc(db, "users", rideData.driverId));
+      const vehicleDoc = await getDoc(doc(db, "vehicles", rideData.vehicleId));
+
+      return {
+        id: docSnap.id,
+        ...rideData,
+        departureTime: rideData.departureTime.toDate(),
+        createdAt: rideData.createdAt.toDate(),
+        driver: driverDoc.exists() ? { uid: driverDoc.id, ...driverDoc.data() } : undefined,
+        vehicle: vehicleDoc.exists() ? { id: vehicleDoc.id, ...vehicleDoc.data() } : undefined,
+      } as FirebaseRide;
     },
     enabled: !!id,
   });
@@ -35,40 +94,36 @@ export function useRide(id: number) {
 
 export function useCreateRide() {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: async (data: Omit<CreateRideRequest, "driverId">) => {
-      const res = await fetch(api.rides.create.path, {
-        method: api.rides.create.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to create ride");
-      }
-      return api.rides.create.responses[201].parse(await res.json());
+    mutationFn: async (data: CreateRideRequest) => {
+      const rideData = {
+        ...data,
+        departureTime: Timestamp.fromDate(data.departureTime),
+        createdAt: Timestamp.fromDate(new Date()),
+      };
+
+      const docRef = await addDoc(collection(db, "rides"), rideData);
+      return { id: docRef.id, ...data };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.rides.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["rides"] });
     },
   });
 }
 
 export function useUpdateRideStatus() {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: "scheduled" | "in_progress" | "completed" | "cancelled" }) => {
-      const url = buildUrl(api.rides.updateStatus.path, { id });
-      const res = await fetch(url, {
-        method: api.rides.updateStatus.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error("Failed to update status");
-      return api.rides.updateStatus.responses[200].parse(await res.json());
+    mutationFn: async ({ id, status }: { id: string; status: FirebaseRide["status"] }) => {
+      const docRef = doc(db, "rides", id);
+      await updateDoc(docRef, { status });
+      return { id, status };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.rides.list.path] });
+      queryClient.invalidateQueries({ queryKey: ["rides"] });
+      queryClient.invalidateQueries({ queryKey: ["ride"] });
     },
   });
 }

@@ -18,7 +18,7 @@ const otpSchema = z.object({
 export default function Login() {
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("");
-  const { login, verify, user } = useAuth();
+  const { login, verify, user, confirmationResult } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -41,7 +41,7 @@ export default function Login() {
       onSuccess: () => {
         setPhone(data.phoneNumber);
         setStep("otp");
-        toast({ title: "OTP Sent", description: "Use 1234 to verify" });
+        toast({ title: "OTP Sent", description: "Check your phone for the verification code" });
       },
       onError: (err) => {
         toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -50,8 +50,13 @@ export default function Login() {
   };
 
   const onVerifyOtp = (data: { otp: string }) => {
+    if (!confirmationResult) {
+      toast({ title: "Error", description: "Please request OTP first", variant: "destructive" });
+      return;
+    }
+
     verify.mutate(
-      { phoneNumber: phone, otp: data.otp },
+      { confirmationResult, otp: data.otp },
       {
         onError: (err) => {
           toast({ title: "Error", description: err.message, variant: "destructive" });

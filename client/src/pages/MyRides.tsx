@@ -16,7 +16,7 @@ export default function MyRides() {
     // Note: A real implementation would filter by driverId on backend, 
     // but for this MVP we might get all and filter locally or add a param.
     // Assuming backend returns all for now, we filter:
-    const myPublishedRides = rides?.filter(r => r.driverId === user?.id);
+    const myPublishedRides = rides?.filter(r => r.driverId === user?.uid);
 
     return (
       <Layout headerTitle="My Posted Rides" showNav={true}>

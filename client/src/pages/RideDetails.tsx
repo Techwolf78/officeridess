@@ -19,7 +19,7 @@ import {
 
 export default function RideDetails() {
   const { id } = useParams<{ id: string }>();
-  const { data: ride, isLoading } = useRide(Number(id));
+  const { data: ride, isLoading } = useRide(id);
   const { user } = useAuth();
   const { mutate: bookRide, isPending: isBooking } = useCreateBooking();
   const { toast } = useToast();
@@ -46,7 +46,7 @@ export default function RideDetails() {
     );
   }
 
-  const isDriver = user?.id === ride.driverId;
+  const isDriver = user?.uid === ride.driverId;
   const totalPrice = ride.pricePerSeat * seats;
 
   const handleBook = () => {

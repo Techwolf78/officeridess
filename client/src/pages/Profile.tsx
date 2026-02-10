@@ -1,33 +1,13 @@
 import { Layout } from "@/components/ui/Layout";
 import { useAuth } from "@/hooks/use-auth";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@shared/routes";
 import { Loader2, LogOut, User, MapPin, Briefcase, Settings, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
 export default function Profile() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfile } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
-
-  const updateRoleMutation = useMutation({
-    mutationFn: async (role: "driver" | "passenger") => {
-      const res = await fetch(api.user.update.path, {
-        method: api.user.update.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
-      });
-      if (!res.ok) throw new Error("Failed to switch role");
-      return api.user.update.responses[200].parse(await res.json());
-    },
-    onSuccess: (updatedUser) => {
-      queryClient.setQueryData([api.auth.me.path], updatedUser);
-      toast({ title: `Switched to ${updatedUser.role}` });
-      setLocation("/");
-    },
-  });
 
   if (!user) return null;
 
@@ -65,8 +45,8 @@ export default function Profile() {
              </div>
 
              <button 
-               onClick={() => updateRoleMutation.mutate(user.role === 'passenger' ? 'driver' : 'passenger')}
-               disabled={updateRoleMutation.isPending}
+               onClick={() => updateProfile.mutate({ role: user.role === 'passenger' ? 'driver' : 'passenger' })}
+               disabled={updateProfile.isPending}
                className="w-full p-4 border-b border-border/50 flex items-center gap-3 hover:bg-secondary/50 transition-colors text-left"
              >
                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-primary">
@@ -76,7 +56,7 @@ export default function Profile() {
                  <p className="text-sm font-medium">Switch to {user.role === 'passenger' ? 'Driver' : 'Passenger'}</p>
                  <p className="text-xs text-muted-foreground">{user.role === 'passenger' ? 'Post rides & earn' : 'Book rides'}</p>
                </div>
-               {updateRoleMutation.isPending && <Loader2 className="animate-spin text-muted-foreground" size={16} />}
+               {updateProfile.isPending && <Loader2 className="animate-spin text-muted-foreground" size={16} />}
              </button>
           </div>
 

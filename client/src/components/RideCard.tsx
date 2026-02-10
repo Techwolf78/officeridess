@@ -1,10 +1,10 @@
-import { Ride, User, Vehicle } from "@shared/schema";
+import { FirebaseRide } from "@/lib/types";
 import { format } from "date-fns";
 import { MapPin, Clock, Users, ChevronRight, Calendar } from "lucide-react";
 import { Link } from "wouter";
 
 interface RideCardProps {
-  ride: Ride & { driver: User; vehicle: Vehicle };
+  ride: FirebaseRide;
   showStatus?: boolean;
 }
 
