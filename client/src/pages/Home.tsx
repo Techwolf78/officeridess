@@ -1,6 +1,7 @@
 import { Layout } from "@/components/ui/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useRides } from "@/hooks/use-rides";
+import { useBookings } from "@/hooks/use-bookings";
 import { RideCard } from "@/components/RideCard";
 import { Loader2, MapPin, Calendar, Search } from "lucide-react";
 import { Link } from "wouter";
@@ -8,9 +9,15 @@ import { format } from "date-fns";
 
 export default function Home() {
   const { user } = useAuth();
-  const { data: rides, isLoading } = useRides();
+  const { data: rides, isLoading } = useRides(user?.role === 'driver' ? { driverId: user?.uid } : undefined);
+  const { data: bookings } = useBookings();
   
   const isDriver = user?.role === 'driver';
+
+  // Helper function to check if user has booked a ride
+  const hasUserBooked = (rideId: string) => {
+    return bookings?.some(b => b.rideId === rideId && b.passengerId === user?.uid && b.status === 'confirmed');
+  };
 
   return (
     <Layout headerTitle="CommuteSync">
@@ -18,7 +25,7 @@ export default function Home() {
         {/* Welcome Section */}
         <div>
           <h2 className="text-2xl font-display font-bold text-foreground">
-            Hello, {user?.fullName?.split(" ")[0] || "Traveler"} 👋
+            Hello, {user?.firstName || "Traveler"} 👋
           </h2>
           <p className="text-muted-foreground mt-1">Where do you want to go today?</p>
         </div>
@@ -69,7 +76,11 @@ export default function Home() {
           ) : rides && rides.length > 0 ? (
             <div className="space-y-4">
               {rides.slice(0, 3).map((ride) => (
-                <RideCard key={ride.id} ride={ride} />
+                <RideCard 
+                  key={ride.id} 
+                  ride={ride} 
+                  userBooking={!isDriver && hasUserBooked(ride.id)}
+                />
               ))}
             </div>
           ) : (

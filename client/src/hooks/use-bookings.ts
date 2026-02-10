@@ -8,12 +8,11 @@ import {
   updateDoc,
   doc,
   getDoc,
-  runTransaction,
   Timestamp
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
-import { FirebaseBooking, CreateBookingRequest } from "@/lib/types";
+import { FirebaseBooking, CreateBookingRequest, CancelBookingRequest, FirebaseUser } from "@/lib/types";
 
 export function useBookings() {
   const { user } = useAuth();
@@ -33,10 +32,35 @@ export function useBookings() {
 
         bookings.push({
           id: docSnap.id,
-          ...bookingData,
+          rideId: bookingData.rideId,
+          passengerId: bookingData.passengerId,
+          seatsBooked: bookingData.seatsBooked,
+          totalPrice: bookingData.totalPrice,
+          status: bookingData.status,
           bookingTime: bookingData.bookingTime.toDate(),
-          ride: rideDoc.exists() ? { id: rideDoc.id, ...rideDoc.data() } : undefined,
-        } as FirebaseBooking);
+          cancelledAt: bookingData.cancelledAt?.toDate(),
+          cancelReason: bookingData.cancelReason,
+          timeBeforeDeparture: bookingData.timeBeforeDeparture,
+          ride: rideDoc.exists() ? {
+            id: rideDoc.id,
+            driverId: rideDoc.data().driverId,
+            vehicleId: rideDoc.data().vehicleId,
+            origin: rideDoc.data().origin,
+            destination: rideDoc.data().destination,
+            originLatLng: rideDoc.data().originLatLng,
+            destLatLng: rideDoc.data().destLatLng,
+            route: rideDoc.data().route || [],
+            stops: rideDoc.data().stops || [],
+            distance: rideDoc.data().distance || 0,
+            eta: rideDoc.data().eta || 0,
+            departureTime: rideDoc.data().departureTime?.toDate(),
+            totalSeats: rideDoc.data().totalSeats,
+            availableSeats: rideDoc.data().availableSeats,
+            pricePerSeat: rideDoc.data().pricePerSeat,
+            status: rideDoc.data().status,
+            createdAt: rideDoc.data().createdAt?.toDate(),
+          } : undefined,
+        });
       }
 
       return bookings.sort((a, b) => b.bookingTime.getTime() - a.bookingTime.getTime());
@@ -53,67 +77,75 @@ export function useCreateBooking() {
     mutationFn: async (data: CreateBookingRequest) => {
       if (!user) throw new Error("Not authenticated");
 
-      return await runTransaction(db, async (transaction) => {
-        // Get ride document
-        const rideRef = doc(db, "rides", data.rideId);
-        const rideSnap = await transaction.get(rideRef);
+      // Get ride document to check availability
+      const rideRef = doc(db, "rides", data.rideId);
+      const rideSnap = await getDoc(rideRef);
 
-        if (!rideSnap.exists()) {
-          throw new Error("Ride not found");
-        }
+      if (!rideSnap.exists()) {
+        throw new Error("Ride not found");
+      }
 
-        const rideData = rideSnap.data();
+      const rideData = rideSnap.data();
 
-        // Check if enough seats available
-        if (rideData.availableSeats < data.seats) {
-          throw new Error("Not enough seats available");
-        }
+      // 🚫 PREVENT DRIVERS FROM BOOKING THEIR OWN RIDES
+      if (rideData.driverId === user.uid) {
+        throw new Error("You cannot book your own ride");
+      }
 
-        // Get user document to check wallet balance
-        const userRef = doc(db, "users", user.uid);
-        const userSnap = await transaction.get(userRef);
+      // 🚫 PREVENT DUPLICATE BOOKINGS - Check if user already booked this ride
+      const existingBookingsQuery = query(
+        collection(db, "bookings"),
+        where("rideId", "==", data.rideId),
+        where("passengerId", "==", user.uid),
+        where("status", "in", ["confirmed", "completed"])
+      );
+      const existingBookings = await getDocs(existingBookingsQuery);
+      if (!existingBookings.empty) {
+        throw new Error("You have already booked this ride");
+      }
 
-        if (!userSnap.exists()) {
-          throw new Error("User not found");
-        }
+      // ✅ VALIDATE SEAT AVAILABILITY
+      if (rideData.availableSeats < data.seats) {
+        throw new Error(`Only ${rideData.availableSeats} seats available`);
+      }
 
-        const userData = userSnap.data();
-        const totalPrice = rideData.pricePerSeat * data.seats;
+      // ✅ VALIDATE RIDE STATUS
+      if (rideData.status !== "scheduled") {
+        throw new Error("This ride is no longer available for booking");
+      }
 
-        if (userData.walletBalance < totalPrice) {
-          throw new Error("Insufficient wallet balance");
-        }
+      // ✅ VALIDATE BOOKING TIME - Prevent last-minute bookings
+      const rideTime = rideData.departureTime.toDate();
+      const now = new Date();
+      const hoursUntilRide = (rideTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      if (hoursUntilRide < 1) {
+        throw new Error("Cannot book rides less than 1 hour before departure");
+      }
 
-        // Create booking
-        const bookingData = {
-          rideId: data.rideId,
-          passengerId: user.uid,
-          seatsBooked: data.seats,
-          totalPrice,
-          status: "confirmed",
-          bookingTime: Timestamp.fromDate(new Date()),
-        };
+      // Create booking
+      const totalPrice = rideData.pricePerSeat * data.seats;
+      const bookingData = {
+        rideId: data.rideId,
+        passengerId: user.uid,
+        seatsBooked: data.seats,
+        totalPrice: totalPrice,
+        status: "confirmed",
+        bookingTime: Timestamp.fromDate(new Date()),
+      };
 
-        const bookingRef = doc(collection(db, "bookings"));
-        transaction.set(bookingRef, bookingData);
+      const bookingRef = await addDoc(collection(db, "bookings"), bookingData);
 
-        // Update ride available seats
-        transaction.update(rideRef, {
-          availableSeats: rideData.availableSeats - data.seats,
-        });
-
-        // Update user wallet balance
-        transaction.update(userRef, {
-          walletBalance: userData.walletBalance - totalPrice,
-        });
-
-        return { id: bookingRef.id, ...bookingData };
+      // Update ride available seats
+      await updateDoc(rideRef, {
+        availableSeats: rideData.availableSeats - data.seats,
       });
+
+      return { id: bookingRef.id, ...bookingData };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
       queryClient.invalidateQueries({ queryKey: ["rides"] });
-      queryClient.invalidateQueries({ queryKey: ["user"] });
+      queryClient.invalidateQueries({ queryKey: ["ride"] }); // Individual ride details
     },
   });
 }
@@ -123,49 +155,103 @@ export function useCancelBooking() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (data: CancelBookingRequest) => {
       if (!user) throw new Error("Not authenticated");
 
-      await runTransaction(db, async (transaction) => {
-        // Get booking document
-        const bookingRef = doc(db, "bookings", id);
-        const bookingSnap = await transaction.get(bookingRef);
+      // Get booking document
+      const bookingRef = doc(db, "bookings", data.bookingId);
+      const bookingSnap = await getDoc(bookingRef);
 
-        if (!bookingSnap.exists()) {
-          throw new Error("Booking not found");
-        }
+      if (!bookingSnap.exists()) {
+        throw new Error("Booking not found");
+      }
 
-        const bookingData = bookingSnap.data();
+      const bookingData = bookingSnap.data();
 
-        // Check if booking belongs to user
-        if (bookingData.passengerId !== user.uid) {
-          throw new Error("Unauthorized");
-        }
+      // Check if booking belongs to user
+      if (bookingData.passengerId !== user.uid) {
+        throw new Error("Unauthorized");
+      }
 
-        // Get ride document
-        const rideRef = doc(db, "rides", bookingData.rideId);
-        const rideSnap = await transaction.get(rideRef);
+      // Check if booking is already cancelled
+      if (bookingData.status === "cancelled") {
+        throw new Error("Booking is already cancelled");
+      }
 
-        if (!rideSnap.exists()) {
-          throw new Error("Ride not found");
-        }
+      // Get ride document to calculate time before departure
+      const rideRef = doc(db, "rides", bookingData.rideId);
+      const rideSnap = await getDoc(rideRef);
 
-        const rideData = rideSnap.data();
+      if (!rideSnap.exists()) {
+        throw new Error("Ride not found");
+      }
 
-        // Update booking status
-        transaction.update(bookingRef, { status: "cancelled" });
+      const rideData = rideSnap.data();
+      const departureTime = rideData.departureTime.toDate();
+      const now = new Date();
+      const timeBeforeDeparture = Math.floor((departureTime.getTime() - now.getTime()) / (1000 * 60)); // minutes
 
-        // Return seats to ride (no refund for simplicity)
-        transaction.update(rideRef, {
-          availableSeats: rideData.availableSeats + bookingData.seatsBooked,
-        });
+      // Update booking with cancellation data
+      const cancellationData = {
+        status: "cancelled",
+        cancelledAt: Timestamp.fromDate(now),
+        cancelReason: data.reason,
+        timeBeforeDeparture: timeBeforeDeparture,
+      };
+
+      await updateDoc(bookingRef, cancellationData);
+
+      // Return seats to ride
+      await updateDoc(rideRef, {
+        availableSeats: rideData.availableSeats + bookingData.seatsBooked,
       });
 
-      return { id };
+      return { id: data.bookingId };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
       queryClient.invalidateQueries({ queryKey: ["rides"] });
     },
+  });
+}
+
+export function useRideBookings(rideId: string) {
+  return useQuery<FirebaseBooking[]>({
+    queryKey: ["ride-bookings", rideId],
+    queryFn: async () => {
+      const q = query(
+        collection(db, "bookings"),
+        where("rideId", "==", rideId),
+        where("status", "==", "confirmed")
+      );
+      const querySnapshot = await getDocs(q);
+
+      const bookings: FirebaseBooking[] = [];
+      for (const docSnap of querySnapshot.docs) {
+        const bookingData = docSnap.data();
+
+        // Fetch passenger user data
+        const passengerDoc = await getDoc(doc(db, "users", bookingData.passengerId));
+        const passenger = passengerDoc.exists() ? {
+          uid: passengerDoc.id,
+          ...passengerDoc.data(),
+          createdAt: passengerDoc.data().createdAt?.toDate(),
+        } as FirebaseUser : undefined;
+
+        bookings.push({
+          id: docSnap.id,
+          rideId: bookingData.rideId,
+          passengerId: bookingData.passengerId,
+          seatsBooked: bookingData.seatsBooked,
+          totalPrice: bookingData.totalPrice,
+          status: bookingData.status,
+          bookingTime: bookingData.bookingTime.toDate(),
+          passenger,
+        });
+      }
+
+      return bookings.sort((a, b) => a.bookingTime.getTime() - b.bookingTime.getTime());
+    },
+    enabled: !!rideId,
   });
 }

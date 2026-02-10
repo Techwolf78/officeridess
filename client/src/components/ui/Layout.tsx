@@ -22,16 +22,11 @@ export function Layout({ children, showNav = true, headerTitle, className }: Lay
         <header className="px-6 py-4 bg-white/80 backdrop-blur-md border-b sticky top-0 z-50 flex items-center justify-between">
           <h1 className="font-display text-xl font-bold text-primary">{headerTitle}</h1>
           <div className="flex items-center gap-3">
-             {user && (
-               <div className="text-sm font-medium text-muted-foreground bg-secondary px-3 py-1 rounded-full">
-                 ${(user.walletBalance / 100).toFixed(2)}
-               </div>
-             )}
              <Link href="/profile" className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden">
                {user?.profileImage ? (
                  <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
                ) : (
-                 user?.fullName?.[0] || <User size={16} />
+                  user?.firstName?.[0] || <User size={16} />
                )}
              </Link>
           </div>

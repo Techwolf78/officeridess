@@ -5,10 +5,18 @@ import { RideCard } from "@/components/RideCard";
 import { Loader2, MapPin, Calendar, Search as SearchIcon, X } from "lucide-react";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
+import { LoadScript, GoogleMap, Marker, Polyline, Autocomplete } from "@react-google-maps/api";
+import { haversineDistance, isPointNearPolyline, getDirections } from "@/lib/utils";
+import { useRef } from "react";
+
+// Static libraries array to prevent re-renders
+const GOOGLE_MAPS_LIBRARIES: ("places")[] = ["places"];
 
 type SearchFilters = {
-  origin: string;
-  destination: string;
+  originLatLng: { lat: number; lng: number };
+  destLatLng: { lat: number; lng: number };
+  route: { lat: number; lng: number }[];
+  pickupLatLng: { lat: number; lng: number };
   date: string;
 };
 
@@ -17,71 +25,198 @@ export default function Search() {
   const { data: rides, isLoading } = useRides(filters);
   const { register, handleSubmit, reset } = useForm<SearchFilters>();
 
+  const [originLatLng, setOriginLatLng] = useState<{lat: number, lng: number} | null>(null);
+  const [destLatLng, setDestLatLng] = useState<{lat: number, lng: number} | null>(null);
+  const [route, setRoute] = useState<{lat: number, lng: number}[]>([]);
+  const [pickupLatLng, setPickupLatLng] = useState<{lat: number, lng: number} | null>(null);
+
+  const [originText, setOriginText] = useState('');
+  const [destText, setDestText] = useState('');
+
+  const originAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const destAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  // Check if Google Maps API key is available
+  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const isGoogleMapsReady = !!googleMapsApiKey;
+
   const onSubmit = (data: SearchFilters) => {
-    // Only set filters if at least one field is filled
-    if (data.origin || data.destination || data.date) {
-      setFilters(data);
+    if (originLatLng && destLatLng && pickupLatLng) {
+      setFilters({
+        originLatLng,
+        destLatLng,
+        route,
+        pickupLatLng,
+        date: data.date,
+      });
     }
   };
 
   const clearFilters = () => {
     setFilters(undefined);
     reset();
+    setOriginLatLng(null);
+    setDestLatLng(null);
+    setRoute([]);
+    setPickupLatLng(null);
+    setOriginText('');
+    setDestText('');
   };
 
   return (
     <Layout headerTitle="Find a Ride" showNav={true}>
       <div className="px-6 py-6 space-y-6">
-        {/* Search Form */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-border/50">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 bg-secondary/50 rounded-xl px-3 py-2 border border-transparent focus-within:border-primary/20 focus-within:bg-white transition-all">
-                <MapPin className="text-muted-foreground shrink-0" size={18} />
-                <input
-                  {...register("origin")}
-                  placeholder="From (e.g. Downtown)"
-                  className="bg-transparent border-none outline-none text-sm w-full placeholder:text-muted-foreground/70"
-                />
-              </div>
-              <div className="flex items-center gap-3 bg-secondary/50 rounded-xl px-3 py-2 border border-transparent focus-within:border-primary/20 focus-within:bg-white transition-all">
-                <MapPin className="text-primary shrink-0" size={18} />
-                <input
-                  {...register("destination")}
-                  placeholder="To (e.g. Tech Park)"
-                  className="bg-transparent border-none outline-none text-sm w-full placeholder:text-muted-foreground/70"
-                />
-              </div>
-              <div className="flex items-center gap-3 bg-secondary/50 rounded-xl px-3 py-2 border border-transparent focus-within:border-primary/20 focus-within:bg-white transition-all">
-                <Calendar className="text-muted-foreground shrink-0" size={18} />
-                <input
-                  type="date"
-                  {...register("date")}
-                  className="bg-transparent border-none outline-none text-sm w-full placeholder:text-muted-foreground/70 min-h-[24px]"
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-3">
-              {filters && (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="px-4 py-2.5 bg-secondary text-foreground rounded-xl font-medium text-sm flex items-center justify-center hover:bg-secondary/80 transition-colors"
-                >
-                  <X size={18} />
-                </button>
-              )}
+          {/* Search Form */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-border/50">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Select Route</h3>
               <button
-                type="submit"
-                className="flex-1 py-2.5 bg-primary text-white rounded-xl font-medium text-sm shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center justify-center gap-2"
+                type="button"
+                onClick={() => {
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        const latLng = { lat: position.coords.latitude, lng: position.coords.longitude };
+                        setOriginLatLng(latLng);
+                      },
+                      (error) => {
+                        console.error(error);
+                        alert('Unable to get location');
+                      }
+                    );
+                  } else {
+                    alert('Geolocation not supported');
+                  }
+                }}
+                className="px-3 py-1 bg-primary text-white text-xs rounded-lg"
               >
-                <SearchIcon size={16} />
-                Search Rides
+                Use My Location
               </button>
             </div>
-          </form>
-        </div>
+            {isGoogleMapsReady ? (
+              <LoadScript googleMapsApiKey={googleMapsApiKey} libraries={GOOGLE_MAPS_LIBRARIES} onError={(error) => console.error('LoadScript error:', error)}>
+                <div className="space-y-4 mb-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Origin</label>
+                    <Autocomplete
+                      onLoad={(autocomplete) => (originAutocompleteRef.current = autocomplete)}
+                      onPlaceChanged={() => {
+                        const place = originAutocompleteRef.current?.getPlace();
+                        if (place?.geometry?.location) {
+                          const latLng = { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() };
+                          setOriginLatLng(latLng);
+                          setOriginText(place.formatted_address || place.name || '');
+                        }
+                      }}
+                    >
+                      <input
+                        type="text"
+                        value={originText}
+                        onChange={(e) => setOriginText(e.target.value)}
+                        placeholder="Enter origin location"
+                        className="w-full bg-secondary rounded-lg px-3 py-2.5 outline-none text-sm"
+                      />
+                    </Autocomplete>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Destination</label>
+                    <Autocomplete
+                      onLoad={(autocomplete) => (destAutocompleteRef.current = autocomplete)}
+                      onPlaceChanged={() => {
+                        const place = destAutocompleteRef.current?.getPlace();
+                        if (place?.geometry?.location) {
+                          const latLng = { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() };
+                          setDestLatLng(latLng);
+                          setDestText(place.formatted_address || place.name || '');
+                        }
+                      }}
+                    >
+                      <input
+                        type="text"
+                        value={destText}
+                        onChange={(e) => setDestText(e.target.value)}
+                        placeholder="Enter destination location"
+                        className="w-full bg-secondary rounded-lg px-3 py-2.5 outline-none text-sm"
+                      />
+                    </Autocomplete>
+                  </div>
+                </div>
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                  <div className="h-64 w-full">
+                    <GoogleMap
+                      center={originLatLng || {lat: 37.7749, lng: -122.4194}}
+                      zoom={10}
+                      onClick={(e: google.maps.MapMouseEvent) => {
+                        const latLng = {lat: e.latLng!.lat(), lng: e.latLng!.lng()};
+                        if (!originLatLng) {
+                          setOriginLatLng(latLng);
+                          setOriginText('Selected Origin');
+                        } else if (!destLatLng) {
+                          setDestLatLng(latLng);
+                          setDestText('Selected Destination');
+                          // Calculate route
+                          getDirections(originLatLng, latLng).then(({ route }) => {
+                            setRoute(route);
+                          }).catch(() => {
+                          setRoute([originLatLng, latLng]);
+                          });
+                        } else if (!pickupLatLng && route.length > 1) {
+                          // Check if pickup is near route
+                          if (isPointNearPolyline(latLng, route, 300)) {
+                            setPickupLatLng(latLng);
+                          } else {
+                            alert('Pickup must be within 300m of the route');
+                          }
+                        }
+                      }}
+                      mapContainerStyle={{ height: '100%', width: '100%' }}
+                    >
+                      {originLatLng && <Marker position={originLatLng} />}
+                      {destLatLng && <Marker position={destLatLng} />}
+                      {pickupLatLng && <Marker position={pickupLatLng} />}
+                      {route.length > 1 && <Polyline path={route} />}
+                    </GoogleMap>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Click to set origin, then destination, then pickup on route.</p>
+                  
+                  <div className="flex items-center gap-3 bg-secondary/50 rounded-xl px-3 py-2 border border-transparent focus-within:border-primary/20 focus-within:bg-white transition-all">
+                    <Calendar className="text-muted-foreground shrink-0" size={18} />
+                    <input
+                      type="date"
+                      {...register("date")}
+                      className="bg-transparent border-none outline-none text-sm w-full placeholder:text-muted-foreground/70 min-h-[24px]"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    {filters && (
+                      <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="px-4 py-2.5 bg-secondary text-foreground rounded-xl font-medium text-sm flex items-center justify-center hover:bg-secondary/80 transition-colors"
+                      >
+                        <X size={18} />
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={!pickupLatLng}
+                      className="flex-1 py-2.5 bg-primary text-white rounded-xl font-medium text-sm shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <SearchIcon size={16} />
+                      Search Rides
+                    </button>
+                  </div>
+                </form>
+              </LoadScript>
+            ) : (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-800 text-sm">
+                  Google Maps is not configured properly. Please check your API key configuration.
+                </p>
+              </div>
+            )}
+          </div>
 
         {/* Results */}
         <div>

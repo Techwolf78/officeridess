@@ -7,15 +7,18 @@ import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
 import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+import Welcome from "@/pages/Welcome";
 import Home from "@/pages/Home";
 import Search from "@/pages/Search";
 import RideDetails from "@/pages/RideDetails";
 import CreateRide from "@/pages/CreateRide";
 import MyRides from "@/pages/MyRides";
 import Profile from "@/pages/Profile";
+import Chat from "@/pages/Chat";
 import NotFound from "@/pages/not-found";
 
-function ProtectedRoute({ component: Component, ...rest }: any) {
+function ProtectedRoute({ component: Component, requireCompleteProfile = true, ...rest }: any) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -27,7 +30,12 @@ function ProtectedRoute({ component: Component, ...rest }: any) {
   }
 
   if (!user) {
-    return <Login />;
+    return <Welcome />;
+  }
+
+  // If profile completion is required and user hasn't completed profile
+  if (requireCompleteProfile && user && !user.firstName) {
+    return <Register />;
   }
 
   return <Component />;
@@ -36,8 +44,10 @@ function ProtectedRoute({ component: Component, ...rest }: any) {
 function Router() {
   return (
     <Switch>
+      <Route path="/" component={Welcome} />
       <Route path="/login" component={Login} />
-      <Route path="/">
+      <Route path="/register" component={Register} />
+      <Route path="/home">
         <ProtectedRoute component={Home} />
       </Route>
       <Route path="/search">
@@ -54,6 +64,9 @@ function Router() {
       </Route>
       <Route path="/profile">
         <ProtectedRoute component={Profile} />
+      </Route>
+      <Route path="/chat/:chatId">
+        <ProtectedRoute component={Chat} />
       </Route>
       <Route component={NotFound} />
     </Switch>

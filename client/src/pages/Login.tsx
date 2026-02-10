@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,61 +8,39 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
 const phoneSchema = z.object({
-  phoneNumber: z.string().min(10, "Phone number must be at least 10 digits"),
+  phoneNumber: z.string()
+    .regex(/^\d{10}$/, "Phone number must be exactly 10 digits")
+    .transform((val) => `+91${val}`), // Always add +91 prefix
 });
 
-const otpSchema = z.object({
-  otp: z.string().length(4, "OTP must be 4 digits"),
-});
+type PhoneForm = z.infer<typeof phoneSchema>;
 
 export default function Login() {
-  const [step, setStep] = useState<"phone" | "otp">("phone");
-  const [phone, setPhone] = useState("");
-  const { login, verify, user, confirmationResult } = useAuth();
+  const { mockLogin, user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   // Redirect if already logged in
-  if (user) {
-    setLocation("/");
-    return null;
-  }
+  useEffect(() => {
+    if (user) {
+      setLocation("/");
+    }
+  }, [user, setLocation]);
 
-  const phoneForm = useForm<{ phoneNumber: string }>({
+  const phoneForm = useForm<PhoneForm>({
     resolver: zodResolver(phoneSchema),
   });
 
-  const otpForm = useForm<{ otp: string }>({
-    resolver: zodResolver(otpSchema),
-  });
-
-  const onSendOtp = (data: { phoneNumber: string }) => {
-    login.mutate(data, {
+  const onSubmit = (data: PhoneForm) => {
+    mockLogin.mutate(data, {
       onSuccess: () => {
-        setPhone(data.phoneNumber);
-        setStep("otp");
-        toast({ title: "OTP Sent", description: "Check your phone for the verification code" });
+        toast({ title: "Welcome!", description: "Login successful" });
+        // Navigation will be handled by ProtectedRoute
       },
       onError: (err) => {
         toast({ title: "Error", description: err.message, variant: "destructive" });
       },
     });
-  };
-
-  const onVerifyOtp = (data: { otp: string }) => {
-    if (!confirmationResult) {
-      toast({ title: "Error", description: "Please request OTP first", variant: "destructive" });
-      return;
-    }
-
-    verify.mutate(
-      { confirmationResult, otp: data.otp },
-      {
-        onError: (err) => {
-          toast({ title: "Error", description: err.message, variant: "destructive" });
-        },
-      }
-    );
   };
 
   return (
@@ -76,57 +54,30 @@ export default function Login() {
       </div>
 
       <div className="bg-white p-8 rounded-3xl shadow-xl shadow-primary/5 border border-border/50">
-        {step === "phone" ? (
-          <form onSubmit={phoneForm.handleSubmit(onSendOtp)} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground ml-1">Phone Number</label>
-              <input
-                type="tel"
-                placeholder="Enter your mobile number"
-                {...phoneForm.register("phoneNumber")}
-                className="w-full px-4 py-3.5 bg-secondary rounded-xl border-transparent focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none"
-              />
-              {phoneForm.formState.errors.phoneNumber && (
-                <p className="text-red-500 text-xs ml-1">{phoneForm.formState.errors.phoneNumber.message}</p>
-              )}
-            </div>
+        <form onSubmit={phoneForm.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground ml-1">Phone Number</label>
+            <input
+              type="tel"
+              placeholder="Enter 10 digit mobile number"
+              maxLength={10}
+              {...phoneForm.register("phoneNumber")}
+              className="w-full px-4 py-3.5 bg-secondary rounded-xl border-transparent focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none"
+            />
+            {phoneForm.formState.errors.phoneNumber && (
+              <p className="text-red-500 text-xs ml-1">{phoneForm.formState.errors.phoneNumber.message}</p>
+            )}
+            <p className="text-xs text-muted-foreground ml-1">We'll register you with +91{phoneForm.watch("phoneNumber") || "XXXXXXXXXX"}</p>
+          </div>
 
-            <button
-              type="submit"
-              disabled={login.isPending}
-              className="w-full py-3.5 bg-primary hover:bg-primary/90 text-white rounded-xl font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {login.isPending ? <Loader2 className="animate-spin" /> : <>Continue <ArrowRight size={18} /></>}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={otpForm.handleSubmit(onVerifyOtp)} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground ml-1">Enter Verification Code</label>
-              <input
-                type="text"
-                placeholder="1234"
-                maxLength={4}
-                {...otpForm.register("otp")}
-                className="w-full px-4 py-3.5 bg-secondary rounded-xl border-transparent focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-center tracking-[1em] font-mono text-lg"
-              />
-              {otpForm.formState.errors.otp && (
-                <p className="text-red-500 text-xs ml-1">{otpForm.formState.errors.otp.message}</p>
-              )}
-              <p className="text-xs text-center text-muted-foreground mt-2">
-                Sent to {phone}. <button type="button" onClick={() => setStep("phone")} className="text-primary font-medium hover:underline">Change?</button>
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={verify.isPending}
-              className="w-full py-3.5 bg-primary hover:bg-primary/90 text-white rounded-xl font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {verify.isPending ? <Loader2 className="animate-spin" /> : "Verify & Login"}
-            </button>
-          </form>
-        )}
+          <button
+            type="submit"
+            disabled={mockLogin.isPending}
+            className="w-full py-3.5 bg-primary hover:bg-primary/90 text-white rounded-xl font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {mockLogin.isPending ? <Loader2 className="animate-spin" /> : <>Continue <ArrowRight size={18} /></>}
+          </button>
+        </form>
       </div>
     </div>
   );

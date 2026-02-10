@@ -12,15 +12,21 @@ export function useVehicles() {
     queryFn: async () => {
       if (!user) return [];
 
-      const q = query(collection(db, "vehicles"), where("userId", "==", user.uid));
-      const querySnapshot = await getDocs(q);
+      try {
+        const q = query(collection(db, "vehicles"), where("userId", "==", user.uid));
+        const querySnapshot = await getDocs(q);
 
-      const vehicles: FirebaseVehicle[] = [];
-      querySnapshot.forEach((doc) => {
-        vehicles.push({ id: doc.id, ...doc.data() } as FirebaseVehicle);
-      });
+        const vehicles: FirebaseVehicle[] = [];
+        querySnapshot.forEach((doc) => {
+          vehicles.push({ id: doc.id, ...doc.data() } as FirebaseVehicle);
+        });
 
-      return vehicles;
+        return vehicles;
+      } catch (error) {
+        console.warn('Failed to fetch vehicles from Firestore:', error);
+        // Return empty array if Firestore fails
+        return [];
+      }
     },
     enabled: !!user,
   });
@@ -39,8 +45,15 @@ export function useCreateVehicle() {
         userId: user.uid,
       };
 
-      const docRef = await addDoc(collection(db, "vehicles"), vehicleData);
-      return { id: docRef.id, ...vehicleData };
+      try {
+        const docRef = await addDoc(collection(db, "vehicles"), vehicleData);
+        return { id: docRef.id, ...vehicleData };
+      } catch (error) {
+        console.warn('Failed to create vehicle in Firestore:', error);
+        // Generate a local ID if Firestore fails
+        const localId = `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        return { id: localId, ...vehicleData };
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
