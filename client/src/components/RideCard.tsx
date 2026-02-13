@@ -66,7 +66,7 @@ export function RideCard({ ride, showStatus, userBooking, isDriverRide, onCancel
           <div className="flex items-start gap-3 relative z-10">
             <div className="w-4 h-4 rounded-full border-2 border-primary bg-white mt-0.5 shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium leading-tight">{ride.origin}</p>
+              <p className="text-sm font-medium leading-tight">{ride.originDisplayName || ride.origin}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {ride.departureTime && !isNaN(new Date(ride.departureTime).getTime()) ? format(new Date(ride.departureTime), "h:mm a") : "Invalid time"}
               </p>
@@ -76,7 +76,7 @@ export function RideCard({ ride, showStatus, userBooking, isDriverRide, onCancel
           <div className="flex items-start gap-3 relative z-10">
             <div className="w-4 h-4 rounded-full bg-primary mt-0.5 shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium leading-tight">{ride.destination}</p>
+              <p className="text-sm font-medium leading-tight">{ride.destDisplayName || ride.destination}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Approx. arrival depending on traffic
               </p>

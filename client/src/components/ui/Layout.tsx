@@ -46,13 +46,19 @@ export function Layout({ children, showNav = true, headerTitle, className }: Lay
             </Link>
 
             {isDriver ? (
-               <Link href="/create-ride" className="relative -top-6 bg-primary text-white p-4 rounded-full shadow-lg shadow-primary/30 hover:shadow-xl hover:-translate-y-1 transition-all">
-                <PlusCircle size={28} />
-              </Link>
+               <div className="flex flex-col items-center gap-0.5">
+                 <Link href="/create-ride" className="relative -top-6 bg-primary text-white p-4 rounded-full shadow-lg shadow-primary/30 hover:shadow-xl hover:-translate-y-1 transition-all">
+                  <PlusCircle size={28} />
+                 </Link>
+                 <span className="text-[10px] font-medium text-primary -mt-2">Offer Ride</span>
+               </div>
             ) : (
-              <Link href="/search" className="relative -top-6 bg-primary text-white p-4 rounded-full shadow-lg shadow-primary/30 hover:shadow-xl hover:-translate-y-1 transition-all">
-                <Search size={28} />
-              </Link>
+              <div className="flex flex-col items-center gap-0.5">
+                <Link href="/search" className="relative -top-6 bg-primary text-white p-4 rounded-full shadow-lg shadow-primary/30 hover:shadow-xl hover:-translate-y-1 transition-all">
+                  <Search size={28} />
+                </Link>
+                <span className="text-[10px] font-medium text-primary -mt-2">Take Ride</span>
+              </div>
             )}
 
             <Link href="/rides" className={cn("flex flex-col items-center gap-1", location === "/rides" ? "text-primary" : "text-muted-foreground")}>

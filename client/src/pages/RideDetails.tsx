@@ -155,12 +155,12 @@ export default function RideDetails() {
             <div className="flex-1 space-y-6">
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Pickup</p>
-                <p className="font-semibold text-foreground">{ride.origin}</p>
+                <p className="font-semibold text-foreground">{ride.originDisplayName || ride.origin}</p>
                 <p className="text-sm text-muted-foreground mt-0.5">{ride.departureTime && !isNaN(new Date(ride.departureTime).getTime()) ? format(new Date(ride.departureTime), "h:mm a, MMM d") : "Invalid time"}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Dropoff</p>
-                <p className="font-semibold text-foreground">{ride.destination}</p>
+                <p className="font-semibold text-foreground">{ride.destDisplayName || ride.destination}</p>
               </div>
             </div>
           </div>
@@ -363,7 +363,7 @@ export default function RideDetails() {
               <div className="bg-secondary/50 p-4 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Route:</span>
-                  <span className="font-medium">{ride.origin} → {ride.destination}</span>
+                  <span className="font-medium">{ride.originDisplayName || ride.origin} → {ride.destDisplayName || ride.destination}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Date & Time:</span>

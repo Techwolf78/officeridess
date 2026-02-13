@@ -44,6 +44,8 @@ export interface FirebaseRide {
   stops: { lat: number; lng: number }[]; // intermediate stops
   distance: number; // in km
   eta: number; // estimated time in minutes
+  originDisplayName?: string; // Shortened display name for origin
+  destDisplayName?: string;   // Shortened display name for destination
   // Populated fields
   driver?: FirebaseUser;
   vehicle?: FirebaseVehicle;

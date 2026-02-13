@@ -28,6 +28,8 @@ const createRideFormSchema = z.object({
   stops: z.array(z.object({ lat: z.number(), lng: z.number() })),
   distance: z.number(),
   eta: z.number(),
+  originDisplayName: z.string().optional(),
+  destDisplayName: z.string().optional(),
   departureTime: z.string().transform((str) => new Date(str)),
   totalSeats: z.coerce.number().min(1, "At least 1 seat required"),
   pricePerSeat: z.coerce.number().min(0, "Price must be positive"),
@@ -125,6 +127,8 @@ export default function CreateRide() {
       stops: data.stops,
       distance: data.distance,
       eta: data.eta,
+      originDisplayName: data.originDisplayName,
+      destDisplayName: data.destDisplayName,
       departureTime: data.departureTime,
       totalSeats: data.totalSeats,
       pricePerSeat: data.pricePerSeat,
@@ -227,6 +231,10 @@ export default function CreateRide() {
                               form.setValue('originLatLng', latLng);
                               form.setValue('origin', place.formatted_address || place.name || '');
                               setOriginText(place.formatted_address || place.name || '');
+                              
+                              // Parse displayName: use place.name if available, otherwise first part of formatted_address before comma
+                              const displayName = place.name || (place.formatted_address ? place.formatted_address.split(',')[0] : '');
+                              form.setValue('originDisplayName', displayName);
                             }
                           }}
                         >
@@ -251,6 +259,10 @@ export default function CreateRide() {
                               form.setValue('destLatLng', latLng);
                               form.setValue('destination', place.formatted_address || place.name || '');
                               setDestText(place.formatted_address || place.name || '');
+                              
+                              // Parse displayName
+                              const displayName = place.name || (place.formatted_address ? place.formatted_address.split(',')[0] : '');
+                              form.setValue('destDisplayName', displayName);
                             }
                           }}
                         >
