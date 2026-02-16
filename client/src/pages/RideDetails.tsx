@@ -235,7 +235,7 @@ export default function RideDetails() {
               </button>
               {ride.driver?.phoneNumber && (
                 <button
-                  onClick={() => handleCall(ride.driver.phoneNumber!)}
+                  onClick={() => ride.driver?.phoneNumber && handleCall(ride.driver.phoneNumber)}
                   className="flex items-center gap-2 px-3 py-2 bg-secondary text-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
                 >
                   <Phone size={16} />

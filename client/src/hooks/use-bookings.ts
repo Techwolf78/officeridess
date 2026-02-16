@@ -120,9 +120,9 @@ export function useCreateBooking() {
       // ✅ VALIDATE BOOKING TIME - Prevent last-minute bookings
       const rideTime = rideData.departureTime.toDate();
       const now = new Date();
-      const hoursUntilRide = (rideTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-      if (hoursUntilRide < 1) {
-        throw new Error("Cannot book rides less than 1 hour before departure");
+      const minutesUntilRide = (rideTime.getTime() - now.getTime()) / (1000 * 60);
+      if (minutesUntilRide < 2) {
+        throw new Error("Cannot book rides less than 2 minutes before departure");
       }
 
       // Create booking

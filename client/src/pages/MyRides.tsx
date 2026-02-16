@@ -10,6 +10,7 @@ import { BookingCardSkeleton } from "@/components/BookingCardSkeleton";
 import { Loader2, Ticket, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +40,7 @@ import { useState } from "react";
 
 export default function MyRides() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const isDriver = user?.role === 'driver';
   const { toast } = useToast();
   const [cancelRideId, setCancelRideId] = useState<string | null>(null);
@@ -198,7 +200,12 @@ export default function MyRides() {
                       </button>
                     )}
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                      booking.status === 'confirmed' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                      booking.status === 'confirmed' ? 'bg-green-50 text-green-600' : 
+                      booking.status === 'waiting' ? 'bg-blue-50 text-blue-600' :
+                      booking.status === 'in_progress' ? 'bg-purple-50 text-purple-600' :
+                      booking.status === 'completed' ? 'bg-yellow-50 text-yellow-600' :
+                      booking.status === 'rated' ? 'bg-gray-50 text-gray-600' :
+                      'bg-red-50 text-red-600'
                     }`}>
                       {booking.status.toUpperCase()}
                     </span>
@@ -207,23 +214,51 @@ export default function MyRides() {
                 
                 {booking.ride && <RideCard ride={booking.ride} />}
 
-                <div className="mt-4 pt-4 border-t flex justify-between text-sm">
-                   <div className="flex flex-col">
-                     <span className="text-muted-foreground">{booking.seatsBooked} Seat(s)</span>
-                     {booking.status === 'cancelled' && booking.cancelledAt && (
-                       <span className="text-xs text-muted-foreground">
-                         Cancelled {format(booking.cancelledAt, "MMM d, h:mm a")}
-                       </span>
-                     )}
-                   </div>
-                   <div className="text-right">
-                     <span className="font-bold">{booking.status === 'confirmed' ? 'Confirmed' : booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}</span>
-                     {booking.status === 'cancelled' && booking.cancelReason && (
-                       <div className="text-xs text-muted-foreground mt-1">
-                         {booking.cancelReason}
-                       </div>
-                     )}
-                   </div>
+                <div className="mt-4 pt-4 border-t space-y-4">
+                  <div className="flex justify-between text-sm">
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground">{booking.seatsBooked} Seat(s)</span>
+                      {booking.status === 'cancelled' && booking.cancelledAt && (
+                        <span className="text-xs text-muted-foreground">
+                          Cancelled {format(booking.cancelledAt, "MMM d, h:mm a")}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold">{booking.status === 'confirmed' ? 'Confirmed' : booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}</span>
+                      {booking.status === 'cancelled' && booking.cancelReason && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {booking.cancelReason}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action buttons based on booking status */}
+                  {booking.status === 'waiting' && (
+                    <button
+                      onClick={() => setLocation(`/ride/${booking.id}/waiting`)}
+                      className="w-full py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold rounded-lg transition-colors"
+                    >
+                      👀 View Driver Location
+                    </button>
+                  )}
+                  {booking.status === 'in_progress' && (
+                    <button
+                      onClick={() => setLocation(`/ride/${booking.id}/tracking`)}
+                      className="w-full py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 font-semibold rounded-lg transition-colors"
+                    >
+                      🗺️ Track Ride
+                    </button>
+                  )}
+                  {booking.status === 'completed' && (
+                    <button
+                      onClick={() => setLocation(`/ride/${booking.id}/rating`)}
+                      className="w-full py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 font-semibold rounded-lg transition-colors"
+                    >
+                      ⭐ Rate Driver
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

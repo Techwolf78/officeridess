@@ -2,18 +2,53 @@ import { Layout } from "@/components/ui/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useRidesRealtime } from "@/hooks/use-rides-realtime";
 import { useBookings } from "@/hooks/use-bookings";
+import { useBookingsRealtime } from "@/hooks/use-bookings-realtime";
 import { RideCard } from "@/components/RideCard";
 import { RideCardSkeleton } from "@/components/RideCardSkeleton";
 import { Loader2, MapPin, Calendar, Search } from "lucide-react";
-import { Link } from "wouter";
-import { format } from "date-fns";
+import { Link, useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function Home() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const { rides, loading } = useRidesRealtime(user?.role === 'driver' ? { driverId: user?.uid } : undefined);
   const { data: bookings } = useBookings();
+  const { bookings: realtimeBookings } = useBookingsRealtime();
+  const [rideBookingMap, setRideBookingMap] = useState<{ [rideId: string]: string }>({});
   
   const isDriver = user?.role === 'driver';
+
+  // Fetch first booking ID for each ride (for drivers)
+  useEffect(() => {
+    if (!isDriver || !rides) return;
+
+    const fetchBookingIds = async () => {
+      const map: { [rideId: string]: string } = {};
+      
+      for (const ride of rides) {
+        try {
+          const q = query(
+            collection(db, "bookings"),
+            where("rideId", "==", ride.id),
+            where("status", "==", "confirmed")
+          );
+          const snapshot = await getDocs(q);
+          if (snapshot.docs.length > 0) {
+            map[ride.id] = snapshot.docs[0].id;
+          }
+        } catch (err) {
+          console.error(`Failed to fetch booking for ride ${ride.id}:`, err);
+        }
+      }
+      
+      setRideBookingMap(map);
+    };
+
+    fetchBookingIds();
+  }, [isDriver, rides]);
 
   // Helper function to check if user has booked a ride
   const hasUserBooked = (rideId: string) => {
@@ -89,7 +124,69 @@ export default function Home() {
                 <RideCardSkeleton />
               </>
             ) : activeRides.length > 0 ? (
-              activeRides.map(ride => <RideCard key={ride.id} ride={ride} />)
+              activeRides.map((ride) => {
+                // Get corresponding booking for this ride (for passengers)
+                const booking = !isDriver ? realtimeBookings?.find(b => b.rideId === ride.id && b.status !== 'cancelled') : null;
+                
+                return (
+                  <div key={ride.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-border/50 hover:shadow-md transition-all">
+                    <div className="p-4">
+                      <RideCard ride={ride} />
+                    </div>
+
+                    {/* Driver Action Panel - I've Arrived Button */}
+                    {isDriver && ride.status === 'scheduled' && rideBookingMap[ride.id] && (
+                      <div className="border-t border-border/50 p-3">
+                        <button
+                          onClick={() => setLocation(`/ride/${rideBookingMap[ride.id]}/waiting`)}
+                          className="w-full py-2 text-xs bg-primary text-white font-semibold rounded-lg hover:opacity-90 transition-opacity"
+                        >
+                          ✓ I've Arrived
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Passenger Status & Actions Panel */}
+                    {!isDriver && booking && booking.status !== 'confirmed' && (
+                      <div className="border-t border-border/50 p-3 space-y-2">
+                        {/* Status Badge */}
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-muted-foreground font-medium">Status: {booking.status.replace('_', ' ').toUpperCase()}</span>
+                        </div>
+
+                        {/* Status-specific buttons */}
+                        {booking.status === 'waiting' && (
+                          <button 
+                            onClick={() => setLocation(`/ride/${booking.id}/waiting`)}
+                            className="w-full py-2 text-xs bg-primary text-white font-semibold rounded-lg hover:opacity-90 transition-opacity">
+                            View Driver Location
+                          </button>
+                        )}
+
+                        {booking.status === 'in_progress' && (
+                          <button 
+                            onClick={() => setLocation(`/ride/${booking.id}/tracking`)}
+                            className="w-full py-2 text-xs bg-primary text-white font-semibold rounded-lg hover:opacity-90 transition-opacity">
+                            Track Ride
+                          </button>
+                        )}
+
+                        {booking.status === 'completed' && (
+                          <button 
+                            onClick={() => setLocation(`/ride/${booking.id}/rating`)}
+                            className="w-full py-2 text-xs bg-primary text-white font-semibold rounded-lg hover:opacity-90 transition-opacity">
+                            Rate Driver
+                          </button>
+                        )}
+
+                        {booking.status === 'rated' && (
+                          <p className="text-xs text-muted-foreground text-center py-2">✓ Ride completed</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <p className="text-sm">

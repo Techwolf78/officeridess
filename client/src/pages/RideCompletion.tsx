@@ -120,6 +120,13 @@ export default function RideCompletion() {
                 Once confirmed, you can proceed to rate the passenger
               </p>
             </div>
+
+            {/* Rate Passenger Button */}
+            <Link href={`/ride/${bookingId}/rating`}>
+              <button className="w-full py-3 bg-primary text-white font-bold rounded-lg hover:bg-primary/90 transition-colors">
+                Rate Passenger
+              </button>
+            </Link>
           </div>
         </div>
       </Layout>

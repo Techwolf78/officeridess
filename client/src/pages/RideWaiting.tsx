@@ -2,13 +2,14 @@ import { Layout } from "@/components/ui/Layout";
 import { useRideStatus } from "@/hooks/use-ride-status";
 import { useBookingRealtime } from "@/hooks/use-booking-realtime";
 import { useAuth } from "@/hooks/use-auth";
-import { Link, useRoute } from "wouter";
+import { Link, useRoute, useLocation } from "wouter";
 import { MapPin, Clock, Phone, MessageCircle, AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
 export default function RideWaiting() {
   const { user } = useAuth();
   const [, params] = useRoute("/ride/:bookingId/waiting");
+  const [, setLocation] = useLocation();
   const bookingId = params?.bookingId;
 
   // Real-time Firebase listener for booking data
@@ -17,6 +18,13 @@ export default function RideWaiting() {
   
   const [waitingMinutes, setWaitingMinutes] = useState(0);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+
+  // Auto-redirect when ride starts
+  useEffect(() => {
+    if (booking?.status === "in_progress") {
+      setLocation(`/ride/${bookingId}/tracking`);
+    }
+  }, [booking?.status, bookingId, setLocation]);
 
   // Simulate driver arriving
   useEffect(() => {
