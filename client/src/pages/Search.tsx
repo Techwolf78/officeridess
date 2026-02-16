@@ -502,49 +502,39 @@ export default function Search() {
       <div className="px-4 py-6 space-y-6">
           {/* Search Form */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-border/50">
-            <div className="flex justify-between items-center mb-4 gap-2">
+            <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Select Route</h3>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleReverseRoute}
-                  className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
-                  title="Swap origin and destination"
-                >
-                  <ArrowRightLeft size={16} className="text-muted-foreground" />
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (navigator.geolocation) {
-                      navigator.geolocation.getCurrentPosition(
-                        async (position) => {
-                          const latLng = { lat: position.coords.latitude, lng: position.coords.longitude };
-                          setOriginLatLng(latLng);
-                          try {
-                            const address = await reverseGeocode(latLng.lat, latLng.lng);
-                            setOriginText(address);
-                          } catch (error) {
-                            console.error('Reverse geocoding failed:', error);
-                            setOriginText(`${latLng.lat.toFixed(6)}, ${latLng.lng.toFixed(6)}`);
-                          }
-                        },
-                        (error) => {
-                          console.error(error);
-                          alert('Unable to get location');
+              <button
+                type="button"
+                onClick={async () => {
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      async (position) => {
+                        const latLng = { lat: position.coords.latitude, lng: position.coords.longitude };
+                        setOriginLatLng(latLng);
+                        try {
+                          const address = await reverseGeocode(latLng.lat, latLng.lng);
+                          setOriginText(address);
+                        } catch (error) {
+                          console.error('Reverse geocoding failed:', error);
+                          setOriginText(`${latLng.lat.toFixed(6)}, ${latLng.lng.toFixed(6)}`);
                         }
-                      );
-                    } else {
-                      alert('Geolocation not supported');
-                    }
-                  }}
-                  className="px-3 py-1 bg-primary text-white text-xs rounded-lg"
-                >
-                  Use My Location
-                </button>
-              </div>
+                      },
+                      (error) => {
+                        console.error(error);
+                        alert('Unable to get location');
+                      }
+                    );
+                  } else {
+                    alert('Geolocation not supported');
+                  }
+                }}
+                className="px-3 py-1 bg-primary text-white text-xs rounded-lg"
+              >
+                Use My Location
+              </button>
             </div>
-            <div className="space-y-4 mb-4">
+            <div className="space-y-0 mb-4">
                   {/* Origin Input */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Origin</label>
@@ -642,8 +632,22 @@ export default function Search() {
                     )}
                   </div>
 
+                  {/* Reverse Button */}
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={handleReverseRoute}
+                      className=" hover:bg-secondary rounded-lg transition-colors"
+                      title="Swap origin and destination"
+                    >
+                      <div className="bg-primary/10 hover:bg-primary/20 text-primary mt-2 rounded-full p-0.5 transition-colors">
+                        <ArrowRightLeft size={16} />
+                      </div>
+                    </button>
+                  </div>
+
                   {/* Destination Input */}
-                  <div className="space-y-2">
+                  <div className="mb-2">
                     <label className="text-sm font-medium">To</label>
                     <div className="relative z-40" ref={toInputRef}>
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
