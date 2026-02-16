@@ -33,6 +33,9 @@ export function useRidesRealtime(filters?: { driverId?: string; includeCancelled
         constraints.push(where("status", "!=", "cancelled"));
       }
 
+      // Only show future rides
+      constraints.push(where("departureTime", ">", Timestamp.now()));
+
       // Filter by driverId if provided
       if (filters?.driverId) {
         constraints.push(where("driverId", "==", filters.driverId));

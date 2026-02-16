@@ -50,7 +50,7 @@ export function useRideRating() {
       fromUserId,
       toUserId,
       rating: ratingData.rating,
-      review: ratingData.review,
+      ...(ratingData.review && { review: ratingData.review }),
       categories: ratingData.categories,
       createdAt: new Date(),
     };

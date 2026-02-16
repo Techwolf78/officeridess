@@ -5,7 +5,7 @@ import { useBookings } from "@/hooks/use-bookings";
 import { useBookingsRealtime } from "@/hooks/use-bookings-realtime";
 import { RideCard } from "@/components/RideCard";
 import { RideCardSkeleton } from "@/components/RideCardSkeleton";
-import { Loader2, MapPin, Calendar, Search } from "lucide-react";
+import { Loader2, MapPin, Calendar, Search, Star } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -180,7 +180,9 @@ export default function Home() {
                         )}
 
                         {booking.status === 'rated' && (
-                          <p className="text-xs text-muted-foreground text-center py-2">✓ Ride completed</p>
+                          <div className="text-center py-0.5">
+                            <p className="text-xs text-muted-foreground">Thanks for rating <span className="font-semibold text-foreground">{booking.passengerRating}</span> ⭐</p>
+                          </div>
                         )}
                       </div>
                     )}

@@ -5,6 +5,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { Link, useRoute } from "wouter";
 import { Star, Send, AlertCircle, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { doc, updateDoc, addDoc, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function RideRating() {
   const { user } = useAuth();
@@ -20,8 +22,25 @@ export default function RideRating() {
   const isDriver = user?.role === "driver";
   const isPassenger = user?.role === "passenger";
 
-  const handleSubmit = () => {
-    submitRating(bookingId || "", user?.uid || "", isDriver ? booking?.passenger?.firstName || "Passenger" : booking?.ride?.driver?.firstName || "Driver");
+  const handleSubmit = async () => {
+    const toUserId = isDriver ? booking?.passenger?.uid || "" : booking?.ride?.driverId || "";
+    const rating = submitRating(bookingId || "", user?.uid || "", toUserId);
+
+    try {
+      // Save rating to firestore
+      await addDoc(collection(db, "ratings"), rating);
+      // Update booking status to 'rated' and add rating
+      const updateData: any = { status: "rated" };
+      if (isPassenger) {
+        updateData.passengerRating = ratingData.rating;
+      } else {
+        updateData.driverRating = ratingData.rating;
+      }
+      await updateDoc(doc(db, "bookings", bookingId || ""), updateData);
+    } catch (error) {
+      console.error("Error submitting rating:", error);
+      // TODO: Show error toast
+    }
   };
 
   // Loading state

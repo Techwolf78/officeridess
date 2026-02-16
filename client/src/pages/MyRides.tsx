@@ -7,7 +7,7 @@ import { useCancelRide } from "@/hooks/use-rides";
 import { RideCard } from "@/components/RideCard";
 import { RideCardSkeleton } from "@/components/RideCardSkeleton";
 import { BookingCardSkeleton } from "@/components/BookingCardSkeleton";
-import { Loader2, Ticket, Calendar } from "lucide-react";
+import { Loader2, Ticket, Calendar, Star } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -258,6 +258,11 @@ export default function MyRides() {
                     >
                       ⭐ Rate Driver
                     </button>
+                  )}
+                  {booking.status === 'rated' && (
+                    <div className="text-center py-0.5">
+                      <p className="text-xs text-muted-foreground">Thanks for rating <span className="font-semibold text-foreground">{booking.passengerRating}</span> ⭐</p>
+                    </div>
                   )}
                 </div>
               </div>

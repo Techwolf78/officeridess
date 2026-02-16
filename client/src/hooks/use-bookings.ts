@@ -41,6 +41,8 @@ export function useBookings() {
           cancelledAt: bookingData.cancelledAt?.toDate(),
           cancelReason: bookingData.cancelReason,
           timeBeforeDeparture: bookingData.timeBeforeDeparture,
+          passengerRating: bookingData.passengerRating,
+          driverRating: bookingData.driverRating,
           ride: rideDoc.exists() ? {
             id: rideDoc.id,
             driverId: rideDoc.data().driverId,

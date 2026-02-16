@@ -80,6 +80,10 @@ export interface FirebaseBooking {
   driverRatingId?: string;
   passengerRatingId?: string;
   
+  // Rating values
+  passengerRating?: number;
+  driverRating?: number;
+  
   // Populated fields
   ride?: FirebaseRide;
   passenger?: FirebaseUser;

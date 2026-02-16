@@ -117,6 +117,8 @@ export function useBookingsRealtime() {
                 cancelledAt: bookingData.cancelledAt instanceof Timestamp ? bookingData.cancelledAt.toDate() : undefined,
                 cancelReason: bookingData.cancelReason,
                 timeBeforeDeparture: bookingData.timeBeforeDeparture,
+                passengerRating: bookingData.passengerRating,
+                driverRating: bookingData.driverRating,
                 ride,
               });
             } catch (err) {
@@ -133,6 +135,8 @@ export function useBookingsRealtime() {
                 cancelledAt: bookingData.cancelledAt instanceof Timestamp ? bookingData.cancelledAt.toDate() : undefined,
                 cancelReason: bookingData.cancelReason,
                 timeBeforeDeparture: bookingData.timeBeforeDeparture,
+                passengerRating: bookingData.passengerRating,
+                driverRating: bookingData.driverRating,
               });
             }
           }

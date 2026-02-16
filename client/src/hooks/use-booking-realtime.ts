@@ -53,6 +53,8 @@ export function useBookingRealtime(bookingId: string) {
           confirmedAt: data.confirmedAt instanceof Timestamp ? data.confirmedAt.toDate() : undefined,
           driverRatingId: data.driverRatingId,
           passengerRatingId: data.passengerRatingId,
+          passengerRating: data.passengerRating,
+          driverRating: data.driverRating,
           cancelledBy: data.cancelledBy,
         };
 
