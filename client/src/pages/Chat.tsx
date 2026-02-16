@@ -3,8 +3,9 @@ import { useRoute, useParams, useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useChat } from '@/hooks/use-chat';
-import { useRides } from '@/hooks/use-rides';
+import { useChatRealtime } from '@/hooks/use-chat-realtime';
+import { useMessages } from '@/hooks/use-messages';
+import { useRidesRealtime } from '@/hooks/use-rides-realtime';
 import { ChatWindow } from '@/components/ChatWindow';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -17,11 +18,11 @@ export default function Chat() {
   const [, setLocation] = useLocation();
   const chatId = params?.chatId;
 
-  const { chats, isLoading: chatsLoading } = useChat();
-  const { data: rides, isLoading: ridesLoading } = useRides();
+  const { chats, loading: chatsLoading } = useChatRealtime();
+  const { rides, loading: ridesLoading } = useRidesRealtime();
 
   const chat = chats.find(c => c.id === chatId);
-  const ride = rides?.find(r => r.id === chat?.rideId);
+  const ride = rides.find(r => r.id === chat?.rideId);
   const otherParticipantId = chat?.participants.find(id => id !== user?.uid);
 
   // Fetch other participant's user data (must be called before any conditional returns)
@@ -107,7 +108,7 @@ export default function Chat() {
   };
 
   const handleBack = () => {
-    setLocation(`/ride/${chat.rideId}`);
+    setLocation('/chat/');
   };
 
   return (

@@ -1,10 +1,11 @@
 import { Layout } from "@/components/ui/Layout";
 import { useAuth } from "@/hooks/use-auth";
-import { useVehicles, useCreateVehicle } from "@/hooks/use-vehicles";
-import { Loader2, LogOut, User, MapPin, Briefcase, Settings, Shield, Car, Plus } from "lucide-react";
+import { useVehiclesRealtime } from "@/hooks/use-vehicles-realtime";
+import { useCreateVehicle } from "@/hooks/use-vehicles";
+import { Loader2, LogOut, Settings, Shield, Car, Plus, Bike } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
-import { useState } from "react";
+import { useLocation, Link } from "wouter";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,20 +16,52 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+  type CarouselApi,
+} from "@/components/ui/carousel";
 
 export default function Profile() {
   const { user, logout, updateProfile } = useAuth();
-  const { data: vehicles, isLoading: loadingVehicles } = useVehicles();
+  const { vehicles, loading: loadingVehicles } = useVehiclesRealtime();
   const createVehicle = useCreateVehicle();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [showAddVehicle, setShowAddVehicle] = useState(false);
-  const [vehicleForm, setVehicleForm] = useState({
+  const [vehicleForm, setVehicleForm] = useState<{
+    model: string;
+    plateNumber: string;
+    color: string;
+    capacity: number;
+    type: 'car' | 'bike';
+  }>({
     model: '',
     plateNumber: '',
     color: '',
-    capacity: 4
+    capacity: 4,
+    type: 'car' // Add vehicle type
   });
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [currentVehicleIndex, setCurrentVehicleIndex] = useState(0);
+
+  // Handle carousel API and track current slide
+  React.useEffect(() => {
+    if (!carouselApi) return;
+
+    const handleSelect = () => {
+      setCurrentVehicleIndex(carouselApi.selectedScrollSnap());
+    };
+
+    carouselApi.on("select", handleSelect);
+
+    return () => {
+      carouselApi.off("select", handleSelect);
+    };
+  }, [carouselApi]);
 
   if (!user) return null;
 
@@ -48,7 +81,7 @@ export default function Profile() {
     }, {
       onSuccess: () => {
         setShowAddVehicle(false);
-        setVehicleForm({ model: '', plateNumber: '', color: '', capacity: 4 });
+        setVehicleForm({ model: '', plateNumber: '', color: '', capacity: 4, type: 'car' });
         toast({
           title: "Vehicle Added!",
           description: "Your vehicle has been added successfully.",
@@ -67,30 +100,30 @@ export default function Profile() {
 
   return (
     <Layout headerTitle="Profile" showNav={true}>
-      <div className="px-6 py-8 pb-24">
+      <div className="px-4 py-2 pb-24">
         {/* Profile Header */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-24 h-24 rounded-full bg-secondary flex items-center justify-center text-4xl font-bold text-muted-foreground mb-4 border-4 border-white shadow-lg">
+        <div className="flex flex-col items-center mb-4">
+          <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center text-2xl font-bold text-muted-foreground mb-2 border-2 border-white shadow-md">
              {user.profileImage ? (
                <img src={user.profileImage} alt="Profile" className="w-full h-full rounded-full object-cover" />
              ) : (
                user.firstName?.[0] || "U"
              )}
           </div>
-          <h2 className="text-xl font-bold">{user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : "User"}</h2>
-          <p className="text-muted-foreground text-sm">{user.phoneNumber}</p>
-          <span className="mt-2 text-xs font-medium bg-primary/10 text-primary px-3 py-1 rounded-full capitalize">
+          <h2 className="text-lg font-bold">{user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : "User"}</h2>
+          <p className="text-muted-foreground text-xs">{user.phoneNumber}</p>
+          <span className="mt-1 text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full capitalize">
             {user.role}
           </span>
         </div>
 
         {/* Menu Items */}
-        <div className="space-y-4">
+        <div className="space-y-4 ">
           {/* Driver Vehicle Management */}
           {user.role === 'driver' && (
             <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-border/50">
-              <div className="p-4 border-b border-border/50">
-                <div className="flex items-center justify-between mb-3">
+              <div className="p-3 border-b border-border/50">
+                <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-sm">My Vehicles</h3>
                   <Dialog open={showAddVehicle} onOpenChange={setShowAddVehicle}>
                     <DialogTrigger asChild>
@@ -104,6 +137,18 @@ export default function Profile() {
                         <DialogTitle>Add New Vehicle</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="type">Vehicle Type</Label>
+                          <select
+                            id="type"
+                            value={vehicleForm.type}
+                            onChange={(e) => setVehicleForm(prev => ({ ...prev, type: e.target.value as 'car' | 'bike' }))}
+                            className="w-full px-3 py-2 border border-border rounded-lg outline-none text-sm bg-white focus:border-primary transition-colors"
+                          >
+                            <option value="car">Car</option>
+                            <option value="bike">Bike</option>
+                          </select>
+                        </div>
                         <div>
                           <Label htmlFor="model">Vehicle Model</Label>
                           <Input
@@ -137,7 +182,7 @@ export default function Profile() {
                             id="capacity"
                             type="number"
                             min="1"
-                            max="8"
+                            max={vehicleForm.type === 'bike' ? '2' : '8'}
                             value={vehicleForm.capacity}
                             onChange={(e) => setVehicleForm(prev => ({ ...prev, capacity: parseInt(e.target.value) || 4 }))}
                           />
@@ -169,18 +214,78 @@ export default function Profile() {
                     <Loader2 className="animate-spin text-muted-foreground" size={20} />
                   </div>
                 ) : vehicles && vehicles.length > 0 ? (
-                  <div className="space-y-3">
-                    {vehicles.map((vehicle) => (
-                      <div key={vehicle.id} className="flex items-center gap-3 p-3 bg-secondary/50 rounded-lg">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Car size={18} className="text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{vehicle.color} {vehicle.model}</p>
-                          <p className="text-xs text-muted-foreground">{vehicle.plateNumber} • {vehicle.capacity} seats</p>
-                        </div>
+                  <div className="space-y-2">
+                    {/* Carousel */}
+                    <Carousel setApi={setCarouselApi} className="w-full">
+                      <CarouselContent>
+                        {vehicles.map((vehicle) => (
+                          <CarouselItem key={vehicle.id} className="px-6">
+                            <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl px-4 py-2 border border-primary/20 shadow-sm hover:shadow-md transition-shadow">
+                              {/* Vehicle Type Icon */}
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                  {vehicle.type === 'bike' ? (
+                                    <Bike size={16} className="text-primary" />
+                                  ) : (
+                                    <Car size={16} className="text-primary" />
+                                  )}
+                                </div>
+                                <span className="text-[10px] font-semibold bg-primary/20 text-primary px-1.5 py-0.5 rounded-full capitalize">
+                                  {vehicle.type || 'car'}
+                                </span>
+                              </div>
+
+                              {/* Vehicle Details */}
+                              <div className="space-y-0.5 mb-1.5">
+                                <h3 className="text-sm font-bold text-foreground leading-tight">
+                                  {vehicle.color} {vehicle.model}
+                                </h3>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {vehicle.plateNumber}
+                                </p>
+                              </div>
+
+                              {/* Capacity */}
+                              <div className="bg-white/50 rounded-md p-1.5 flex items-center justify-between">
+                                <span className="text-[10px] font-medium text-muted-foreground">Capacity</span>
+                                <span className="text-[10px] font-bold text-foreground">{vehicle.capacity} seats</span>
+                              </div>
+                            </div>
+                          </CarouselItem>
+                        ))}
+                      </CarouselContent>
+                      {vehicles.length > 1 && (
+                        <>
+                          <CarouselPrevious className="hidden sm:flex" />
+                          <CarouselNext className="hidden sm:flex" />
+                        </>
+                      )}
+                    </Carousel>
+
+                    {/* Navigation Dots */}
+                    {vehicles.length > 1 && (
+                      <div className="flex items-center justify-center gap-2 pt-1">
+                        {vehicles.map((_, index) => (
+                          <button
+                            key={index}
+                            onClick={() => carouselApi?.scrollTo(index)}
+                            className={`h-2 rounded-full transition-all ${
+                              index === currentVehicleIndex
+                                ? 'bg-primary w-6'
+                                : 'bg-border/50 w-2 hover:bg-border'
+                            }`}
+                            aria-label={`Go to vehicle ${index + 1}`}
+                          />
+                        ))}
                       </div>
-                    ))}
+                    )}
+
+                    {/* Vehicle Count */}
+                    {vehicles.length > 1 && (
+                      <div className="text-center text-xs text-muted-foreground">
+                        {currentVehicleIndex + 1} of {vehicles.length} vehicles
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-6">
@@ -210,19 +315,21 @@ export default function Profile() {
              </button>
           </div>
 
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-border/50">
-             <div className="p-4 border-b border-border/50 flex items-center gap-3 hover:bg-secondary/50 cursor-pointer">
-               <Settings size={18} className="text-muted-foreground" />
-               <span className="text-sm font-medium">Settings</span>
-             </div>
-             <button 
-               onClick={() => logout.mutate()}
-               className="w-full p-4 flex items-center gap-3 hover:bg-red-50 cursor-pointer text-red-500 text-left"
-             >
-               <LogOut size={18} />
-               <span className="text-sm font-medium">Logout</span>
-             </button>
-          </div>
+          <Link href="/settings">
+            <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-border/50 cursor-pointer hover:shadow-md transition-shadow mt-3">
+               <button className="w-full p-4 border-b border-border/50 flex items-center gap-3 hover:bg-secondary/50 text-left">
+                 <Settings size={18} className="text-muted-foreground" />
+                 <span className="text-sm font-medium">Settings</span>
+               </button>
+               <button 
+                 onClick={() => logout.mutate()}
+                 className="w-full p-4 flex items-center gap-3 hover:bg-red-50 cursor-pointer text-red-500 text-left"
+               >
+                 <LogOut size={18} />
+                 <span className="text-sm font-medium">Logout</span>
+               </button>
+            </div>
+          </Link>
         </div>
       </div>
     </Layout>

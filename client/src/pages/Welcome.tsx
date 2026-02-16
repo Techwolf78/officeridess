@@ -11,25 +11,81 @@ export default function Welcome() {
   const slides = [
     {
       icon: <Car className="w-20 h-20 text-primary" />,
-      title: "Share Your Ride",
+      title: (
+        <span>
+          Share Your{" "}
+          <span className="relative inline-block">
+            Ride
+            <svg
+              className="absolute w-full h-2 -bottom-1 left-0 text-green-300"
+              viewBox="0 0 100 10"
+              preserveAspectRatio="none"
+            >
+              <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="4" fill="none" />
+            </svg>
+          </span>
+        </span>
+      ),
       description: "Offer seats in your car and help others commute sustainably while sharing the journey.",
       color: "from-green-400 to-green-600"
     },
     {
       icon: <Users className="w-20 h-20 text-primary" />,
-      title: "Find Companions",
+      title: (
+        <span>
+          Find{" "}
+          <span className="relative inline-block">
+            Companions
+            <svg
+              className="absolute w-full h-2 -bottom-1 left-0 text-green-300"
+              viewBox="0 0 100 10"
+              preserveAspectRatio="none"
+            >
+              <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="4" fill="none" />
+            </svg>
+          </span>
+        </span>
+      ),
       description: "Connect with people going the same way. Travel together, make friends, and reduce traffic.",
       color: "from-blue-400 to-blue-600"
     },
     {
       icon: <Heart className="w-20 h-20 text-primary" />,
-      title: "Sustainable Travel",
+      title: (
+        <span>
+          Sustainable{" "}
+          <span className="relative inline-block">
+            Travel
+            <svg
+              className="absolute w-full h-2 -bottom-1 left-0 text-green-300"
+              viewBox="0 0 100 10"
+              preserveAspectRatio="none"
+            >
+              <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="4" fill="none" />
+            </svg>
+          </span>
+        </span>
+      ),
       description: "Reduce your carbon footprint by sharing rides and making commuting more eco-friendly.",
       color: "from-purple-400 to-purple-600"
     },
     {
       icon: <Shield className="w-20 h-20 text-primary" />,
-      title: "Safe & Verified",
+      title: (
+        <span>
+          Safe &{" "}
+          <span className="relative inline-block">
+            Verified
+            <svg
+              className="absolute w-full h-2 -bottom-1 left-0 text-green-300"
+              viewBox="0 0 100 10"
+              preserveAspectRatio="none"
+            >
+              <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="4" fill="none" />
+            </svg>
+          </span>
+        </span>
+      ),
       description: "Verified drivers and passengers with ratings and reviews for your peace of mind.",
       color: "from-orange-400 to-orange-600"
     }
@@ -69,7 +125,7 @@ export default function Welcome() {
             <Car size={20} className="text-white" />
           </div>
           <h1 className="text-xl font-display font-bold text-foreground">
-            Commute<span className="text-primary">Sync</span>
+            OFFICE<span className="text-primary">RIDES</span>
           </h1>
         </div>
         <button
@@ -81,14 +137,35 @@ export default function Welcome() {
       </div>
 
       {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-20 left-20 w-32 h-32 bg-primary rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 right-20 w-40 h-40 bg-primary rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-primary rounded-full blur-3xl"></div>
+      <div className="absolute inset-0 opacity-15">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: "linear-gradient(to right, rgba(156, 163, 175, 0.7) 1.5px, transparent 1.5px), linear-gradient(to bottom, rgba(156, 163, 175, 0.7) 1.5px, transparent 1.5px)",
+            backgroundSize: "48px 48px",
+          }}
+        />
+        
+        {/* Glass morphism left side */}
+        <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-white/20 to-transparent backdrop-blur-sm"></div>
+        
+        {/* Glass morphism right side */}
+        <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-white/20 to-transparent backdrop-blur-sm"></div>
+        
+        {/* Original blur circles with reduced opacity */}
+        <div className="absolute top-20 left-20 w-32 h-32 bg-primary rounded-full blur-3xl opacity-10"></div>
+        <div className="absolute bottom-20 right-20 w-40 h-40 bg-primary rounded-full blur-3xl opacity-10"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-primary rounded-full blur-3xl opacity-10"></div>
+      </div>
+
+      {/* Additional glass morphism overlays for depth */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute left-0 top-0 bottom-0 w-48 bg-gradient-to-r from-white/10 to-transparent"></div>
+        <div className="absolute right-0 top-0 bottom-0 w-48 bg-gradient-to-l from-white/10 to-transparent"></div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col justify-center items-center px-6 z-10">
+      <div className="flex-1 flex flex-col justify-center items-center px-4 z-10">
         <div className="text-center max-w-md mx-auto">
           {/* Slide Content */}
           <div className="mb-12 transition-all duration-500 ease-in-out">

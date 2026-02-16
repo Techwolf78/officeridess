@@ -23,6 +23,7 @@ export interface FirebaseVehicle {
   plateNumber: string;
   color: string;
   capacity: number;
+  type?: 'car' | 'bike';
 }
 
 export interface FirebaseRide {
@@ -41,6 +42,9 @@ export interface FirebaseRide {
   originLatLng: { lat: number; lng: number };
   destLatLng: { lat: number; lng: number };
   route: { lat: number; lng: number }[]; // waypoints for the route
+  routePolyline: string; // encoded polyline for efficient storage
+  routeSteps: string[]; // step-by-step instructions
+  routeRoads: string[]; // main road names
   stops: { lat: number; lng: number }[]; // intermediate stops
   distance: number; // in km
   eta: number; // estimated time in minutes
@@ -57,12 +61,25 @@ export interface FirebaseBooking {
   passengerId: string;
   seatsBooked: number;
   totalPrice: number;
-  status: "confirmed" | "cancelled" | "completed";
+  status: "confirmed" | "waiting" | "in_progress" | "completed" | "rated" | "cancelled";
   bookingTime: Date;
+  
+  // Ride lifecycle timestamps
+  activatedAt?: Date;    // When ride date arrived (status → waiting)
+  startedAt?: Date;      // When driver started ride (status → in_progress)
+  completedAt?: Date;    // When driver marked destination
+  confirmedAt?: Date;    // When passenger confirmed completion
+  
   // Cancellation tracking
   cancelledAt?: Date;
   cancelReason?: string;
   timeBeforeDeparture?: number; // minutes before departure when cancelled
+  cancelledBy?: 'driver' | 'passenger';
+  
+  // Rating references
+  driverRatingId?: string;
+  passengerRatingId?: string;
+  
   // Populated fields
   ride?: FirebaseRide;
   passenger?: FirebaseUser;
@@ -70,11 +87,17 @@ export interface FirebaseBooking {
 
 export interface FirebaseRating {
   id: string;
-  rideId: string;
+  bookingId: string;
   fromUserId: string;
   toUserId: string;
   rating: number; // 1-5
-  comment?: string;
+  review?: string;
+  categories?: {
+    cleanliness?: number;
+    behaviour?: number;
+    communication?: number;
+    punctuality?: number;
+  };
   createdAt: Date;
 }
 
@@ -86,7 +109,7 @@ export interface FirebaseChat {
   createdAt: Date;
   lastMessageAt: Date;
   lastMessage?: string;
-  unreadCount: { [userId: string]: number };
+  unreadCounts: { [userId: string]: number };
 }
 
 export interface FirebaseMessage {
@@ -97,6 +120,7 @@ export interface FirebaseMessage {
   type: 'text' | 'image' | 'system';
   timestamp: Date;
   readBy: string[]; // user IDs who have read this message
+  readAtTimestamps?: { [userId: string]: Date }; // timestamp when each user read the message
 }
 
 // Zod schemas for validation
@@ -140,6 +164,9 @@ export const firebaseRideSchema = z.object({
   originLatLng: z.object({ lat: z.number(), lng: z.number() }),
   destLatLng: z.object({ lat: z.number(), lng: z.number() }),
   route: z.array(z.object({ lat: z.number(), lng: z.number() })),
+  routePolyline: z.string(),
+  routeSteps: z.array(z.string()),
+  routeRoads: z.array(z.string()),
   stops: z.array(z.object({ lat: z.number(), lng: z.number() })),
   distance: z.number(),
   eta: z.number(),
@@ -187,3 +214,30 @@ export type CreateVehicleRequest = Omit<FirebaseVehicle, 'id'>;
 export type CreateChatRequest = { rideId: string; participants: string[] };
 export type SendMessageRequest = { chatId: string; content: string; type?: 'text' | 'image' | 'system' };
 export type MarkMessagesReadRequest = { chatId: string; messageIds: string[] };
+
+// Support Ticket System
+export interface SupportTicket {
+  id: string;
+  userId: string;
+  issueType: 'account' | 'payment' | 'ride' | 'driver_verification' | 'technical' | 'other';
+  subject: string;
+  description: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  createdAt: Date;
+  updatedAt: Date;
+  attachments?: string[]; // URLs to attached files
+  notes?: string; // Internal notes from support team
+}
+
+export type CreateSupportTicketRequest = Omit<SupportTicket, 'id' | 'userId' | 'status' | 'createdAt' | 'updatedAt' | 'notes'>;
+
+// Route option for multiple route selection
+export interface RouteOption {
+  polyline: string;
+  distance: number; // km
+  eta: number; // minutes
+  steps: string[]; // step-by-step instructions
+  roads: string[]; // main road names
+  hasTolls: boolean;
+}

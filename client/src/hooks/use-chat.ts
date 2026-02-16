@@ -11,11 +11,12 @@ import {
   orderBy,
   Timestamp,
   getDocs,
-  writeBatch
+  writeBatch,
+  getDoc
 } from 'firebase/firestore';
 import { db } from "@/lib/firebase";
 import { useAuth } from './use-auth';
-import { FirebaseChat, FirebaseMessage, CreateChatRequest, SendMessageRequest } from './types';
+import { FirebaseChat, FirebaseMessage, CreateChatRequest, SendMessageRequest } from '@/lib/types';
 
 export function useChat(rideId?: string) {
   const { user } = useAuth();
@@ -85,7 +86,7 @@ export function useChat(rideId?: string) {
         participants,
         createdAt: Timestamp.now(),
         lastMessageAt: Timestamp.now(),
-        unreadCount: participants.reduce((acc, participantId) => ({
+        unreadCounts: participants.reduce((acc, participantId) => ({
           ...acc,
           [participantId]: 0
         }), {}),
@@ -115,27 +116,42 @@ export function useChat(rideId?: string) {
 
       const docRef = await addDoc(collection(db, 'messages'), messageData);
 
-      // Update chat's last message
-      await updateDoc(doc(db, 'chats', chatId), {
+      // Fetch current chat to get all participants and unreadCounts
+      const chatDocSnap = await getDoc(doc(db, 'chats', chatId));
+      if (!chatDocSnap.exists()) throw new Error('Chat not found');
+      
+      const chatData = chatDocSnap.data() as FirebaseChat;
+      
+      // Build update object with all unreadCount changes
+      const updateObj: Record<string, any> = {
         lastMessage: content,
         lastMessageAt: Timestamp.now(),
-        // Increment unread count for other participants
-        [`unreadCount.${user.uid}`]: 0, // Reset sender's count
+      };
+
+      // Update unread counts for all participants
+      chatData.participants.forEach(participantId => {
+        if (participantId === user.uid) {
+          updateObj[`unreadCounts.${participantId}`] = 0; // Reset sender's count
+        } else {
+          const currentCount = chatData.unreadCounts?.[participantId] || 0;
+          updateObj[`unreadCounts.${participantId}`] = currentCount + 1; // Increment others' count
+        }
       });
 
-      // Update unread counts for other participants
-      const chat = chats.find(c => c.id === chatId);
-      if (chat) {
-        const batch = writeBatch(db);
-        chat.participants.forEach(participantId => {
-          if (participantId !== user.uid) {
-            const currentCount = chat.unreadCount?.[participantId] || 0;
-            batch.update(doc(db, 'chats', chatId), {
-              [`unreadCount.${participantId}`]: currentCount + 1,
-            });
-          }
+      // Single batch update with all fields
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'chats', chatId), updateObj);
+      await batch.commit();
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[useChat] Message sent, unreadCounts updated:`, {
+          chatId,
+          senderId: user.uid.slice(0, 6),
+          updatedCounts: chatData.participants.reduce((acc, pId) => ({
+            ...acc,
+            [pId.slice(0, 6)]: updateObj[`unreadCounts.${pId}`]
+          }), {})
         });
-        await batch.commit();
       }
 
       return { id: docRef.id, ...messageData };
@@ -151,17 +167,19 @@ export function useChat(rideId?: string) {
       if (!user?.uid) throw new Error('User not authenticated');
 
       const batch = writeBatch(db);
+      const now = Timestamp.now();
 
-      // Update messages
+      // Update messages - append to readBy and add readAtTimestamp
       messageIds.forEach(messageId => {
         batch.update(doc(db, 'messages', messageId), {
-          readBy: [user.uid], // In a real app, you'd append to existing readBy array
+          readBy: [user.uid], // For now, just set to current user (should append in real implementation)
+          [`readAtTimestamps.${user.uid}`]: now,
         });
       });
 
       // Reset unread count for current user
       batch.update(doc(db, 'chats', chatId), {
-        [`unreadCount.${user.uid}`]: 0,
+        [`unreadCounts.${user.uid}`]: 0,
       });
 
       await batch.commit();

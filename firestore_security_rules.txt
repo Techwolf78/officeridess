@@ -1,0 +1,56 @@
+// Firestore Security Rules for Support Tickets
+// Add this to your firestore.rules file
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Existing rules...
+    
+    // Support Tickets Collection - Secure access
+    match /supportTickets/{ticketId} {
+      // Users can only read/write their own tickets
+      allow create: if request.auth != null && 
+                       request.auth.uid == request.resource.data.userId &&
+                       // Validate required fields exist
+                       request.resource.data.userId is string &&
+                       request.resource.data.issueType is string &&
+                       request.resource.data.subject is string &&
+                       request.resource.data.description is string &&
+                       request.resource.data.priority is string &&
+                       request.resource.data.status == 'open' &&
+                       // Validate field lengths
+                       request.resource.data.subject.size() >= 5 &&
+                       request.resource.data.subject.size() <= 100 &&
+                       request.resource.data.description.size() >= 20 &&
+                       request.resource.data.description.size() <= 5000 &&
+                       // Validate issue type
+                       request.resource.data.issueType in ['account', 'payment', 'ride', 'driver_verification', 'technical', 'other'] &&
+                       // Validate priority
+                       request.resource.data.priority in ['low', 'medium', 'high', 'urgent'] &&
+                       // Prevent direct status/notes manipulation
+                       !('notes' in request.resource.data);
+      
+      // Users can read their own tickets
+      allow read: if request.auth != null && 
+                     request.auth.uid == resource.data.userId;
+      
+      // Users can update their own open tickets only
+      allow update: if request.auth != null && 
+                       request.auth.uid == resource.data.userId &&
+                       resource.data.status == 'open' &&
+                       // Only allow updating description before support team reviews
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['description', 'updatedAt']) &&
+                       request.resource.data.description.size() >= 20 &&
+                       request.resource.data.description.size() <= 5000;
+      
+      // Support team (admins) can read/update all tickets
+      // This would require a custom claim like admin:true
+      // allow read: if request.auth.token.admin == true;
+      // allow update: if request.auth.token.admin == true;
+      
+      deny delete: true; // Never allow deleting tickets
+    }
+  }
+}

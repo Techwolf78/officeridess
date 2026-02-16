@@ -125,7 +125,7 @@ export function RideCard({ ride, showStatus, userBooking, isDriverRide, onCancel
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock size={14} />
-              <span>{ride.eta ? `${ride.eta} min` : "ETA unknown"}</span>
+              <span>{ride.eta ? `${Math.round(ride.eta)} min` : "ETA unknown"}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <MapPin size={14} />

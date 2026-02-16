@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { MessageBubble } from './MessageBubble';
 import { FirebaseMessage } from '@/lib/types';
 import { useAuth } from '@/hooks/use-auth';
+import { useTypingStatus } from '@/hooks/use-typing-status';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
@@ -11,6 +12,7 @@ interface MessageListProps {
   hasMore?: boolean;
   onLoadMore?: () => void;
   participants?: { [userId: string]: { name: string; avatar?: string } };
+  chatId?: string;
 }
 
 export function MessageList({
@@ -18,9 +20,11 @@ export function MessageList({
   isLoading,
   hasMore,
   onLoadMore,
-  participants = {}
+  participants = {},
+  chatId = ''
 }: MessageListProps) {
   const { user } = useAuth();
+  const { otherUserTyping } = useTypingStatus(chatId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -80,6 +84,18 @@ export function MessageList({
             />
           );
         })
+      )}
+
+      {/* Typing Indicator */}
+      {otherUserTyping && (
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex gap-1">
+            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+          <span className="text-sm text-muted-foreground">typing...</span>
+        </div>
       )}
 
       <div ref={messagesEndRef} />

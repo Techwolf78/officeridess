@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { FirebaseMessage } from '@/lib/types';
 import { format } from 'date-fns';
+import { useState } from 'react';
 
 interface MessageBubbleProps {
   message: FirebaseMessage;
@@ -16,8 +17,55 @@ export function MessageBubble({
   senderName,
   senderAvatar
 }: MessageBubbleProps) {
+  const [showReadTime, setShowReadTime] = useState(false);
+
+  // Ensure timestamp is a valid Date
+  const getValidDate = (timestamp: any): Date => {
+    if (!timestamp) return new Date();
+    if (timestamp instanceof Date) return timestamp;
+    if (typeof timestamp === 'object' && 'toDate' in timestamp) {
+      return timestamp.toDate();
+    }
+    const parsed = new Date(timestamp);
+    return isNaN(parsed.getTime()) ? new Date() : parsed;
+  };
+
+  const validTimestamp = getValidDate(message.timestamp);
+
   const formatTime = (timestamp: Date) => {
-    return format(timestamp, 'HH:mm');
+    try {
+      return format(timestamp, 'HH:mm');
+    } catch (error) {
+      return 'Invalid time';
+    }
+  };
+
+  const formatReadTime = (timestamp: Date) => {
+    try {
+      return format(timestamp, 'hh:mm a');
+    } catch (error) {
+      return 'Invalid time';
+    }
+  };
+
+  // Determine read status
+  const isSent = message.readBy.length >= 1; // At least seen by recipient
+  const isRead = message.readBy.length > 1; // Both users have read
+  const readAtTimestamp = message.readAtTimestamps ? Object.values(message.readAtTimestamps)[0] : null;
+
+  // Get read status checkmark
+  const getReadCheckmark = () => {
+    if (isRead) {
+      return (
+        <span className="ml-1 text-primary font-bold" title={readAtTimestamp ? `Read ${formatReadTime(readAtTimestamp)}` : 'Read'}>
+          ✓✓
+        </span>
+      );
+    } else if (isSent) {
+      return <span className="ml-1 font-bold" title="Delivered">✓✓</span>;
+    } else {
+      return <span className="ml-1 font-bold" title="Sending">✓</span>;
+    }
   };
 
   return (
@@ -51,12 +99,20 @@ export function MessageBubble({
         </div>
 
         <div className={cn(
-          "text-xs mt-1",
+          "text-xs mt-1 flex items-center",
           isOwn ? "text-primary-foreground/70" : "text-muted-foreground"
         )}>
-          {formatTime(message.timestamp)}
-          {isOwn && message.readBy.length > 1 && (
-            <span className="ml-1">✓✓</span>
+          <span>{formatTime(validTimestamp)}</span>
+          {isOwn && getReadCheckmark()}
+          {isOwn && isRead && readAtTimestamp && (
+            <div
+              className="ml-2 cursor-help text-xs opacity-70 hover:opacity-100"
+              onMouseEnter={() => setShowReadTime(true)}
+              onMouseLeave={() => setShowReadTime(false)}
+              title={`Read at ${formatReadTime(readAtTimestamp)}`}
+            >
+              {showReadTime && `(${formatReadTime(readAtTimestamp)})`}
+            </div>
           )}
         </div>
       </div>

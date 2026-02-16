@@ -1,8 +1,12 @@
 import { Layout } from "@/components/ui/Layout";
 import { useAuth } from "@/hooks/use-auth";
-import { useBookings, useCancelBooking } from "@/hooks/use-bookings";
-import { useRides, useCancelRide } from "@/hooks/use-rides";
+import { useBookingsRealtime } from "@/hooks/use-bookings-realtime";
+import { useRidesRealtime } from "@/hooks/use-rides-realtime";
+import { useCancelBooking } from "@/hooks/use-bookings";
+import { useCancelRide } from "@/hooks/use-rides";
 import { RideCard } from "@/components/RideCard";
+import { RideCardSkeleton } from "@/components/RideCardSkeleton";
+import { BookingCardSkeleton } from "@/components/BookingCardSkeleton";
 import { Loader2, Ticket, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -42,8 +46,8 @@ export default function MyRides() {
   const [cancelReason, setCancelReason] = useState<string>("");
 
   // Always call hooks at the top level
-  const { data: rides, isLoading: ridesLoading } = useRides(isDriver ? { driverId: user?.uid, includeCancelled: true } : undefined);
-  const { data: bookings, isLoading: bookingsLoading } = useBookings();
+  const { rides, loading: ridesLoading } = useRidesRealtime(isDriver ? { driverId: user?.uid, includeCancelled: true } : undefined);
+  const { bookings, loading: bookingsLoading } = useBookingsRealtime();
   const cancelRide = useCancelRide();
   const cancelBooking = useCancelBooking();
 
@@ -108,9 +112,13 @@ export default function MyRides() {
     // Driver View: Show rides created by me
     return (
       <Layout headerTitle="My Posted Rides" showNav={true}>
-        <div className="px-6 py-6">
+        <div className="px-4 py-6">
           {ridesLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>
+            <div className="space-y-4">
+              <RideCardSkeleton />
+              <RideCardSkeleton />
+              <RideCardSkeleton />
+            </div>
           ) : rides && rides.length > 0 ? (
             <div className="space-y-4">
               {rides.map(ride => (
@@ -164,9 +172,13 @@ export default function MyRides() {
   // Passenger View: Show my bookings
   return (
     <Layout headerTitle="My Bookings" showNav={true}>
-      <div className="px-6 py-6">
+      <div className="px-4 py-6">
         {bookingsLoading ? (
-          <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>
+          <div className="space-y-4">
+            <BookingCardSkeleton />
+            <BookingCardSkeleton />
+            <BookingCardSkeleton />
+          </div>
         ) : bookings && bookings.length > 0 ? (
           <div className="space-y-4">
             {bookings.map(booking => (
@@ -265,7 +277,7 @@ export default function MyRides() {
             <button
               onClick={confirmCancelBooking}
               disabled={!cancelReason || cancelBooking.isPending}
-              className="flex-1 px-6 py-2 bg-red-600 text-white rounded-lg font-semibold shadow-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-semibold shadow-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {cancelBooking.isPending && <Loader2 className="animate-spin" size={16} />}
               Cancel Booking

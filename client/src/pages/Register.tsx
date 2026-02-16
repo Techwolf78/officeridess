@@ -69,7 +69,7 @@ export default function Register() {
       onSuccess: () => {
         localStorage.removeItem('registration_step1'); // Clean up
         toast({
-          title: "Welcome to CommuteSync!",
+          title: "Welcome to OFFICERIDES!",
           description: "Your profile has been set up successfully.",
         });
         setLocation("/");
@@ -86,7 +86,7 @@ export default function Register() {
 
   return (
     <Layout headerTitle={`Complete Your Profile (${currentStep}/2)`}>
-      <div className="px-6 py-8">
+      <div className="px-4 py-8">
         <div className="text-center mb-8">
           <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 rotate-3 ${
             currentStep === 1 ? 'bg-primary/10' : 'bg-green-500/10'

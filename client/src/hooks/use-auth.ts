@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FirebaseUser, LoginRequest, UpdateProfileRequest } from "@/lib/types";
 import { useLocation } from "wouter";
@@ -16,13 +16,45 @@ export function useAuth() {
     const savedUser = localStorage.getItem('mockUser');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsedUser = JSON.parse(savedUser) as FirebaseUser;
+        setUser(parsedUser);
+
+        // Set up real-time listener for current user's document in Firestore
+        if (parsedUser.uid) {
+          const unsubscribe = onSnapshot(
+            doc(db, 'users', parsedUser.uid),
+            (docSnap) => {
+              if (docSnap.exists()) {
+                const firestoreUser = {
+                  uid: docSnap.id,
+                  ...docSnap.data(),
+                  createdAt: docSnap.data().createdAt?.toDate?.() || new Date(docSnap.data().createdAt),
+                } as FirebaseUser;
+                setUser(firestoreUser);
+                localStorage.setItem('mockUser', JSON.stringify(firestoreUser));
+              }
+              // Set loading to false after first snapshot
+              setIsLoading(false);
+            },
+            (error) => {
+              console.warn('Error listening to user changes:', error);
+              setIsLoading(false);
+            }
+          );
+          
+          return () => unsubscribe();
+        } else {
+          // No uid, set loading to false
+          setIsLoading(false);
+        }
       } catch (error) {
         console.error('Error parsing saved user:', error);
         localStorage.removeItem('mockUser');
+        setIsLoading(false);
       }
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
   const mockLoginMutation = useMutation({

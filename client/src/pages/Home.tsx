@@ -1,15 +1,16 @@
 import { Layout } from "@/components/ui/Layout";
 import { useAuth } from "@/hooks/use-auth";
-import { useRides } from "@/hooks/use-rides";
+import { useRidesRealtime } from "@/hooks/use-rides-realtime";
 import { useBookings } from "@/hooks/use-bookings";
 import { RideCard } from "@/components/RideCard";
+import { RideCardSkeleton } from "@/components/RideCardSkeleton";
 import { Loader2, MapPin, Calendar, Search } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 
 export default function Home() {
   const { user } = useAuth();
-  const { data: rides, isLoading } = useRides(user?.role === 'driver' ? { driverId: user?.uid } : undefined);
+  const { rides, loading } = useRidesRealtime(user?.role === 'driver' ? { driverId: user?.uid } : undefined);
   const { data: bookings } = useBookings();
   
   const isDriver = user?.role === 'driver';
@@ -19,9 +20,25 @@ export default function Home() {
     return bookings?.some(b => b.rideId === rideId && b.passengerId === user?.uid && b.status === 'confirmed');
   };
 
+  // Active rides filtering
+  const now = new Date();
+  let activeRides = [];
+  if (isDriver) {
+    activeRides = rides?.filter(ride => {
+      const expiry = new Date(ride.departureTime.getTime() + (ride.eta + 30) * 60 * 1000);
+      return now < expiry;
+    }) || [];
+  } else {
+    const bookedRides = rides?.filter(ride => hasUserBooked(ride.id)) || [];
+    activeRides = bookedRides.filter(ride => {
+      const expiry = new Date(ride.departureTime.getTime() + (ride.eta + 30) * 60 * 1000);
+      return now < expiry;
+    });
+  }
+
   return (
-    <Layout headerTitle="CommuteSync">
-      <div className="px-6 py-6 space-y-8">
+    <Layout headerTitle="OFFICERIDES">
+      <div className="px-4 py-6 space-y-8">
         {/* Welcome Section */}
         <div>
           <h2 className="text-2xl font-display font-bold text-foreground">
@@ -58,45 +75,36 @@ export default function Home() {
           </div>
         )}
 
-        {/* Upcoming Rides Section */}
-        <div>
-          <div className="flex justify-between items-end mb-4">
-            <h3 className="text-lg font-display font-bold">
-              {isDriver ? "Your Posted Rides" : "Available Rides"}
-            </h3>
-            <Link href={isDriver ? "/rides" : "/search"} className="text-sm text-primary font-medium hover:underline">
-              View all
-            </Link>
-          </div>
-
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="animate-spin text-primary" />
-            </div>
-          ) : rides && rides.length > 0 ? (
-            <div className="space-y-4">
-              {rides.slice(0, 3).map((ride) => (
-                <RideCard 
-                  key={ride.id} 
-                  ride={ride} 
-                  userBooking={!isDriver && hasUserBooked(ride.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-border">
-              <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center mx-auto mb-3 text-muted-foreground">
-                <Search size={20} />
+        {/* Active Rides Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">
+            {isDriver ? "Your Posted Rides" : "Your Booked Rides"}
+          </h3>
+          <div className="space-y-3">
+            {loading ? (
+              // Show skeleton loaders while loading
+              <>
+                <RideCardSkeleton />
+                <RideCardSkeleton />
+                <RideCardSkeleton />
+              </>
+            ) : activeRides.length > 0 ? (
+              activeRides.map(ride => <RideCard key={ride.id} ride={ride} />)
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">
+                  {isDriver ? "No active rides posted yet" : "No active bookings yet"}
+                </p>
+                {!isDriver && (
+                  <Link href="/search" className="text-primary hover:underline text-sm mt-2 block">
+                    Find a ride →
+                  </Link>
+                )}
               </div>
-              <p className="text-muted-foreground text-sm">No rides found at the moment.</p>
-              {isDriver && (
-                <Link href="/create-ride" className="text-primary font-medium text-sm mt-2 block">
-                  Post a ride now
-                </Link>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
+
       </div>
     </Layout>
   );

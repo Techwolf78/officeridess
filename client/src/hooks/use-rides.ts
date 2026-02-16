@@ -9,14 +9,15 @@ import {
   getDoc,
   addDoc,
   updateDoc,
-  Timestamp
+  Timestamp,
+  limit
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
 import { FirebaseRide, CreateRideRequest } from "@/lib/types";
-import { haversineDistance, isPointNearPolyline } from "@/lib/utils";
+import { haversineDistance, isPointNearPolyline, doesRouteOverlap, decodePolyline } from "@/lib/utils";
 
-export function useRides(filters?: { origin?: string; destination?: string; date?: string; includeCancelled?: boolean; driverId?: string; originLatLng?: {lat: number, lng: number}; destLatLng?: {lat: number, lng: number}; pickupLatLng?: {lat: number, lng: number} }) {
+export function useRides(filters?: { origin?: string; destination?: string; date?: string; time?: string; includeCancelled?: boolean; driverId?: string; originLatLng?: {lat: number, lng: number}; destLatLng?: {lat: number, lng: number}; pageSize?: number; page?: number }) {
   const queryKey = ["rides", filters];
 
   return useQuery({
@@ -58,6 +59,10 @@ export function useRides(filters?: { origin?: string; destination?: string; date
           q = query(q, where("departureTime", "<=", Timestamp.fromDate(endOfDay)));
         }
 
+        // Add pagination
+        const pageSize = filters?.pageSize || 20;
+        q = query(q, limit(pageSize));
+
         const querySnapshot = await getDocs(q);
         const rides: FirebaseRide[] = [];
 
@@ -92,15 +97,14 @@ export function useRides(filters?: { origin?: string; destination?: string; date
           } as FirebaseRide);
         }
 
-        // Filter by proximity if lat/lng provided
+        // Filter by route overlap if lat/lng provided
         let filteredRides = rides;
-        if (filters?.originLatLng && filters?.destLatLng && filters?.pickupLatLng) {
+        if (filters?.originLatLng && filters?.destLatLng) {
           filteredRides = rides.filter(ride => {
-            if (!ride.originLatLng || !ride.destLatLng || !ride.route) return false;
-            const originDist = haversineDistance(ride.originLatLng.lat, ride.originLatLng.lng, filters.originLatLng.lat, filters.originLatLng.lng);
-            const destDist = haversineDistance(ride.destLatLng.lat, ride.destLatLng.lng, filters.destLatLng.lat, filters.destLatLng.lng);
-            const pickupNear = isPointNearPolyline(filters.pickupLatLng, ride.route, 300);
-            return originDist <= 5 && destDist <= 5 && pickupNear; // 5km for origin/dest, 300m for pickup
+            if (!ride.routePolyline) return false;
+            // Decode polyline
+            const polyline = decodePolyline(ride.routePolyline);
+            return doesRouteOverlap(filters.originLatLng!, filters.destLatLng!, polyline, 300);
           });
         }
 

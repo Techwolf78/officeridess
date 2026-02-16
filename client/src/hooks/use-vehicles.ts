@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { collection, query, where, getDocs, addDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
 import { FirebaseVehicle, CreateVehicleRequest } from "@/lib/types";
@@ -53,6 +53,46 @@ export function useCreateVehicle() {
         // Generate a local ID if Firestore fails
         const localId = `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         return { id: localId, ...vehicleData };
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+    },
+  });
+}
+
+export function useUpdateVehicle() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ vehicleId, data }: { vehicleId: string; data: Partial<CreateVehicleRequest> }) => {
+      try {
+        const vehicleRef = doc(db, "vehicles", vehicleId);
+        await updateDoc(vehicleRef, data);
+        return { id: vehicleId, ...data };
+      } catch (error) {
+        console.warn('Failed to update vehicle in Firestore:', error);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+    },
+  });
+}
+
+export function useDeleteVehicle() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (vehicleId: string) => {
+      try {
+        const vehicleRef = doc(db, "vehicles", vehicleId);
+        await deleteDoc(vehicleRef);
+        return vehicleId;
+      } catch (error) {
+        console.warn('Failed to delete vehicle from Firestore:', error);
+        throw error;
       }
     },
     onSuccess: () => {

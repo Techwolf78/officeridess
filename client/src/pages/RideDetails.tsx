@@ -1,7 +1,8 @@
 import { useParams, useLocation } from "wouter";
-import { useRide } from "@/hooks/use-rides";
+import { useRideRealtime } from "@/hooks/use-ride-realtime";
+import { useRideBookingsRealtime } from "@/hooks/use-ride-bookings-realtime";
 import { useAuth } from "@/hooks/use-auth";
-import { useCreateBooking, useBookings, useRideBookings } from "@/hooks/use-bookings";
+import { useCreateBooking, useBookings } from "@/hooks/use-bookings";
 import { useChat } from "@/hooks/use-chat";
 import { Layout } from "@/components/ui/Layout";
 import { Loader2, ArrowLeft, Calendar, Clock, MapPin, Users, Shield, User as UserIcon, CheckCircle, X, MessageCircle, Phone } from "lucide-react";
@@ -9,6 +10,8 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { GoogleMap, Polyline } from "@react-google-maps/api";
+import { decodePolyline } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -20,16 +23,19 @@ import {
 
 export default function RideDetails() {
   const { id } = useParams<{ id: string }>();
-  const { data: ride, isLoading } = useRide(id);
+  const { ride, loading: isLoading } = useRideRealtime(id || "");
   const { user } = useAuth();
   const { mutate: bookRide, isPending: isBooking } = useCreateBooking();
   const { data: bookings } = useBookings();
-  const { data: rideBookings, isLoading: isLoadingBookings } = useRideBookings(id!);
+  const { bookings: rideBookings, loading: isLoadingBookings } = useRideBookingsRealtime(id || "");
   const { chats, getOrCreateChat } = useChat();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [seats, setSeats] = useState(1);
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // Decode route polyline
+  const routePath = ride?.routePolyline ? decodePolyline(ride.routePolyline) : [];
 
   // Check if user already booked this ride
   const userBooking = bookings?.find(b => b.rideId === id && b.passengerId === user?.uid && b.status === 'confirmed');
@@ -102,10 +108,21 @@ export default function RideDetails() {
 
   return (
     <div className="min-h-screen bg-background relative pb-36">
-      {/* Header Image/Map Placeholder */}
+      {/* Header Map */}
       <div className="h-48 bg-primary/10 w-full relative overflow-hidden">
-        {/* Abstract pattern or map placeholder */}
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary via-transparent to-transparent"></div>
+        {routePath.length > 0 ? (
+          <GoogleMap
+              center={routePath.length > 0 ? routePath[Math.floor(routePath.length / 2)] : {lat: 37.7749, lng: -122.4194}}
+              zoom={10}
+              mapContainerStyle={{ height: '100%', width: '100%' }}
+              options={{ disableDefaultUI: true, zoomControl: false, gestureHandling: 'none' }}
+            >
+              <Polyline path={routePath} options={{ strokeColor: '#3b82f6', strokeWeight: 4 }} />
+            </GoogleMap>
+
+        ) : (
+          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary via-transparent to-transparent"></div>
+        )}
         <div className="absolute top-6 left-6 z-10">
           <Link href="/">
             <button className="bg-white/90 backdrop-blur rounded-full p-2 shadow-sm hover:bg-white transition-colors">
@@ -115,7 +132,7 @@ export default function RideDetails() {
         </div>
       </div>
 
-      <div className="-mt-6 bg-background rounded-t-3xl relative px-6 py-8 min-h-[calc(100vh-160px)]">
+      <div className="-mt-6 bg-background rounded-t-3xl relative px-4 py-8 min-h-[calc(100vh-160px)]">
         <div className="flex justify-between items-start mb-6">
           <div>
             <span className="text-xs font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full mb-2 inline-block">
@@ -154,7 +171,7 @@ export default function RideDetails() {
             </div>
             <div className="flex-1 space-y-6">
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Pickup</p>
+                <p className="text-xs text-muted-foreground mb-1">Origin</p>
                 <p className="font-semibold text-foreground">{ride.originDisplayName || ride.origin}</p>
                 <p className="text-sm text-muted-foreground mt-0.5">{ride.departureTime && !isNaN(new Date(ride.departureTime).getTime()) ? format(new Date(ride.departureTime), "h:mm a, MMM d") : "Invalid time"}</p>
               </div>
@@ -165,6 +182,27 @@ export default function RideDetails() {
             </div>
           </div>
         </div>
+
+        {/* Route Summary */}
+        {ride.routeRoads && ride.routeRoads.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-border/50 mb-6">
+            <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider text-muted-foreground">Route Summary</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Distance</span>
+                <span className="font-medium">{ride.distance.toFixed(1)} km</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Duration</span>
+                <span className="font-medium">{Math.round(ride.eta)} min</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Main Roads</span>
+                <span className="font-medium text-right">{ride.routeRoads.slice(0, 3).join(', ')}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Driver Info */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-border/50 mb-6">
@@ -389,7 +427,7 @@ export default function RideDetails() {
               
               <div className="text-sm text-muted-foreground">
                 💰 Payment will be handled directly with the driver in cash.<br/>
-                📍 Meet at the designated pickup point 5-10 minutes before departure.<br/>
+                📍 Meet at the designated origin point 5-10 minutes before departure.<br/>
                 📱 Keep this booking confirmation for reference.
               </div>
             </div>
@@ -404,7 +442,7 @@ export default function RideDetails() {
             <button
               onClick={handleBook}
               disabled={isBooking}
-              className="flex-1 px-6 py-2 bg-primary text-white rounded-lg font-semibold shadow-md hover:bg-primary/90 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 bg-primary text-white rounded-lg font-semibold shadow-md hover:bg-primary/90 flex items-center justify-center gap-2"
             >
               {isBooking && <Loader2 className="animate-spin" size={16} />}
               Confirm Booking

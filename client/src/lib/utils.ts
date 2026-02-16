@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { RouteOption } from "./types"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -70,29 +71,124 @@ export function decodePolyline(encoded: string): {lat: number, lng: number}[] {
   return points;
 }
 
-// Fetch directions from Google API
-export async function getDirections(origin: {lat: number, lng: number}, destination: {lat: number, lng: number}, waypoints?: {lat: number, lng: number}[]): Promise<{route: {lat: number, lng: number}[], distance: number, eta: number}> {
+// Reverse geocode lat/lng to address
+export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&key=${apiKey}`;
-
-  if (waypoints && waypoints.length > 0) {
-    const waypointsStr = waypoints.map(w => `${w.lat},${w.lng}`).join('|');
-    url += `&waypoints=${waypointsStr}`;
-  }
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
 
   const response = await fetch(url);
   const data = await response.json();
 
-  if (data.status === 'OK') {
-    const polyline = data.routes[0].overview_polyline.points;
-    const route = decodePolyline(polyline);
-    const distance = data.routes[0].legs.reduce((acc: number, leg: any) => acc + leg.distance.value, 0) / 1000; // km
-    const eta = data.routes[0].legs.reduce((acc: number, leg: any) => acc + leg.duration.value, 0) / 60; // minutes
-    return { route, distance, eta };
+  if (data.status === 'OK' && data.results.length > 0) {
+    return data.results[0].formatted_address;
+  } else {
+    console.error('Reverse geocoding error:', data.status);
+    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`; // Fallback to coordinates
+  }
+}
+
+// Validate direction: ensure origin comes before destination on the route
+export function validateDirection(polyline: {lat: number, lng: number}[], origin: {lat: number, lng: number}, destination: {lat: number, lng: number}): boolean {
+  let originIndex = -1;
+  let destIndex = -1;
+  let minOriginDist = Infinity;
+  let minDestDist = Infinity;
+
+  for (let i = 0; i < polyline.length; i++) {
+    const originDist = haversineDistance(origin.lat, origin.lng, polyline[i].lat, polyline[i].lng);
+    if (originDist < minOriginDist) {
+      minOriginDist = originDist;
+      originIndex = i;
+    }
+    const destDist = haversineDistance(destination.lat, destination.lng, polyline[i].lat, polyline[i].lng);
+    if (destDist < minDestDist) {
+      minDestDist = destDist;
+      destIndex = i;
+    }
+  }
+
+  return originIndex < destIndex;
+}
+
+// Check if user route overlaps with driver route (simple proximity check for partial matching)
+export function doesRouteOverlap(userOrigin: {lat: number, lng: number}, userDest: {lat: number, lng: number}, driverPolyline: {lat: number, lng: number}[], thresholdMeters: number = 300): boolean {
+  const originNear = isPointNearPolyline(userOrigin, driverPolyline, thresholdMeters);
+  const destNear = isPointNearPolyline(userDest, driverPolyline, thresholdMeters);
+  const directionValid = validateDirection(driverPolyline, userOrigin, userDest);
+  return originNear && destNear && directionValid;
+}
+
+// Fetch directions from Google API (single route)
+export async function getDirections(origin: {lat: number, lng: number}, destination: {lat: number, lng: number}, waypoints?: {lat: number, lng: number}[]): Promise<{route: {lat: number, lng: number}[], distance: number, eta: number}> {
+  const options = await getRouteOptions(origin, destination);
+  if (options.length > 0) {
+    const selected = options[0];
+    return { route: decodePolyline(selected.polyline), distance: selected.distance, eta: selected.eta };
+  } else {
+    // Fallback
+    const dist = haversineDistance(origin.lat, origin.lng, destination.lat, destination.lng);
+    return { route: [origin, destination], distance: dist, eta: Math.round(dist / 50 * 60) };
+  }
+}
+
+// Fetch multiple route options from Google Directions API
+export async function getRouteOptions(origin: {lat: number, lng: number}, destination: {lat: number, lng: number}): Promise<RouteOption[]> {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&alternatives=true&key=${apiKey}`;
+
+  const response = await fetch(url);
+  const data = await response.json();
+
+  if (data.status === 'OK' && data.routes.length > 0) {
+    return data.routes.map((route: any) => {
+      const polyline = route.overview_polyline.points;
+      const distance = route.legs.reduce((acc: number, leg: any) => acc + leg.distance.value, 0) / 1000; // km
+      const eta = route.legs.reduce((acc: number, leg: any) => acc + leg.duration.value, 0) / 60; // minutes
+
+      // Extract steps
+      const steps: string[] = [];
+      route.legs.forEach((leg: any) => {
+        leg.steps.forEach((step: any) => {
+          // Clean HTML from instructions
+          const instruction = step.html_instructions.replace(/<[^>]*>/g, '');
+          steps.push(instruction);
+        });
+      });
+
+      // Extract main roads: unique road names from steps
+      const roads: string[] = [];
+      const roadRegex = /(?:onto|via|along)\s+([^,]+?)(?:\s*\(|,|$)/gi;
+      steps.forEach(step => {
+        let match;
+        while ((match = roadRegex.exec(step)) !== null) {
+          const road = match[1].trim();
+          if (!roads.includes(road)) roads.push(road);
+        }
+      });
+
+      // Check for tolls: if any step mentions toll
+      const hasTolls = steps.some(step => step.toLowerCase().includes('toll'));
+
+      return {
+        polyline,
+        distance,
+        eta,
+        steps,
+        roads,
+        hasTolls,
+      };
+    });
   } else {
     console.error('Directions API error:', data.status);
     // Fallback to straight line
     const dist = haversineDistance(origin.lat, origin.lng, destination.lat, destination.lng);
-    return { route: [origin, destination], distance: dist, eta: Math.round(dist / 50 * 60) };
+    return [{
+      polyline: '',
+      distance: dist,
+      eta: Math.round(dist / 50 * 60),
+      steps: [`Drive from ${origin.lat.toFixed(6)}, ${origin.lng.toFixed(6)} to ${destination.lat.toFixed(6)}, ${destination.lng.toFixed(6)}`],
+      roads: [],
+      hasTolls: false,
+    }];
   }
 }

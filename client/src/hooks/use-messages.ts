@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   collection,
@@ -9,28 +9,50 @@ import {
   limit,
   startAfter,
   DocumentSnapshot,
-  Timestamp
+  Timestamp,
+  getDocs
 } from 'firebase/firestore';
 import { db } from "@/lib/firebase";
 import { useAuth } from './use-auth';
-import { FirebaseMessage } from './types';
+import { FirebaseMessage } from '@/lib/types';
 
 interface UseMessagesOptions {
   chatId: string;
   pageSize?: number;
 }
 
-export function useMessages({ chatId, pageSize = 50 }: UseMessagesOptions) {
+// Global cache for messages by chatId
+const messagesCacheRef = new Map<string, {
+  messages: FirebaseMessage[];
+  lastDoc: DocumentSnapshot | null;
+  hasMore: boolean;
+  timestamp: number;
+}>();
+
+export function useMessages({ chatId, pageSize = 20 }: UseMessagesOptions) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<FirebaseMessage[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const realTimeListenerRef = useRef<(() => void) | null>(null);
 
-  // Initial messages query
+  // Initial messages query - Load only 20 most recent messages
   const { data: initialMessages, isLoading } = useQuery({
     queryKey: ['messages', chatId, 'initial'],
     queryFn: async () => {
+      // Check cache first (valid for 5 minutes)
+      const cache = messagesCacheRef.get(chatId);
+      const now = Date.now();
+      if (cache && (now - cache.timestamp) < 5 * 60 * 1000) {
+        setMessages(cache.messages);
+        setLastDoc(cache.lastDoc);
+        setHasMore(cache.hasMore);
+        return cache.messages;
+      }
+
+      // Fetch initial 20 messages (newest first)
       const q = query(
         collection(db, 'messages'),
         where('chatId', '==', chatId),
@@ -45,9 +67,22 @@ export function useMessages({ chatId, pageSize = 50 }: UseMessagesOptions) {
         timestamp: doc.data().timestamp?.toDate(),
       })) as FirebaseMessage[];
 
+      // Set pagination state
       if (snapshot.docs.length > 0) {
-        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        const oldestDoc = snapshot.docs[snapshot.docs.length - 1];
+        setLastDoc(oldestDoc);
         setHasMore(snapshot.docs.length === pageSize);
+        
+        // Cache this data
+        const reversedMessages = messagesData.reverse();
+        messagesCacheRef.set(chatId, {
+          messages: reversedMessages,
+          lastDoc: oldestDoc,
+          hasMore: snapshot.docs.length === pageSize,
+          timestamp: now
+        });
+      } else {
+        setHasMore(false);
       }
 
       return messagesData.reverse(); // Reverse to show oldest first
@@ -55,7 +90,14 @@ export function useMessages({ chatId, pageSize = 50 }: UseMessagesOptions) {
     enabled: !!chatId,
   });
 
-  // Real-time listener for new messages
+  // Set initial messages when loaded
+  useEffect(() => {
+    if (initialMessages && initialMessages.length > 0) {
+      setMessages(initialMessages);
+    }
+  }, [initialMessages]);
+
+  // Real-time listener for new messages (append only strategy)
   useEffect(() => {
     if (!chatId) return;
 
@@ -65,47 +107,77 @@ export function useMessages({ chatId, pageSize = 50 }: UseMessagesOptions) {
       orderBy('timestamp', 'asc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const updatedMessages = snapshot.docs.map(doc => ({
+    realTimeListenerRef.current = onSnapshot(q, (snapshot) => {
+      const allMessages = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         timestamp: doc.data().timestamp?.toDate(),
       })) as FirebaseMessage[];
 
-      setMessages(updatedMessages);
-      queryClient.setQueryData(['messages', chatId, 'realtime'], updatedMessages);
+      // Update messages - use real-time data as source of truth
+      // This ensures we always have the latest state from Firestore
+      setMessages(allMessages);
+      
+      // Update cache
+      const cache = messagesCacheRef.get(chatId);
+      if (cache) {
+        messagesCacheRef.set(chatId, {
+          ...cache,
+          messages: allMessages,
+          timestamp: Date.now()
+        });
+      }
     });
 
-    return unsubscribe;
-  }, [chatId, queryClient]);
+    return () => {
+      if (realTimeListenerRef.current) {
+        realTimeListenerRef.current();
+      }
+    };
+  }, [chatId]);
 
-  // Load more messages (pagination)
+  // Load more messages (pagination - load older messages)
   const loadMore = async () => {
-    if (!lastDoc || !hasMore) return;
+    if (!lastDoc || !hasMore || isLoadingMore) return;
 
-    const q = query(
-      collection(db, 'messages'),
-      where('chatId', '==', chatId),
-      orderBy('timestamp', 'desc'),
-      startAfter(lastDoc),
-      limit(pageSize)
-    );
+    setIsLoadingMore(true);
+    try {
+      const q = query(
+        collection(db, 'messages'),
+        where('chatId', '==', chatId),
+        orderBy('timestamp', 'desc'),
+        startAfter(lastDoc),
+        limit(pageSize)
+      );
 
-    const snapshot = await getDocs(q);
-    const moreMessages = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      timestamp: doc.data().timestamp?.toDate(),
-    })) as FirebaseMessage[];
+      const snapshot = await getDocs(q);
+      const moreMessages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate(),
+      })) as FirebaseMessage[];
 
-    if (snapshot.docs.length > 0) {
-      setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-      setHasMore(snapshot.docs.length === pageSize);
+      if (snapshot.docs.length > 0) {
+        const oldestDoc = snapshot.docs[snapshot.docs.length - 1];
+        setLastDoc(oldestDoc);
+        setHasMore(snapshot.docs.length === pageSize);
 
-      // Prepend older messages
-      setMessages(prev => [...moreMessages.reverse(), ...prev]);
-    } else {
-      setHasMore(false);
+        // Prepend older messages to beginning
+        setMessages(prev => [...moreMessages.reverse(), ...prev]);
+
+        // Update cache
+        const newMessages = [...moreMessages.reverse(), ...messages];
+        messagesCacheRef.set(chatId, {
+          messages: newMessages,
+          lastDoc: oldestDoc,
+          hasMore: snapshot.docs.length === pageSize,
+          timestamp: Date.now()
+        });
+      } else {
+        setHasMore(false);
+      }
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -128,16 +200,44 @@ export function useMessages({ chatId, pageSize = 50 }: UseMessagesOptions) {
         : msg
     ));
 
-    // In a real implementation, you'd call the markAsRead mutation from useChat
-    // For now, we'll just update the local state
+    // Update cache
+    const cache = messagesCacheRef.get(chatId);
+    if (cache) {
+      const updatedMessages = cache.messages.map(msg =>
+        messageIds.includes(msg.id) && !msg.readBy.includes(user.uid)
+          ? { ...msg, readBy: [...msg.readBy, user.uid] }
+          : msg
+      );
+      messagesCacheRef.set(chatId, {
+        ...cache,
+        messages: updatedMessages,
+        timestamp: Date.now()
+      });
+    }
+  };
+
+  // Add message to local state (for optimistic updates)
+  const addMessage = (message: FirebaseMessage) => {
+    setMessages(prev => [...prev, message]);
+    
+    // Update cache
+    const cache = messagesCacheRef.get(chatId);
+    if (cache) {
+      messagesCacheRef.set(chatId, {
+        ...cache,
+        messages: [...cache.messages, message],
+        timestamp: Date.now()
+      });
+    }
   };
 
   return {
-    messages: messages.length > 0 ? messages : (initialMessages || []),
+    messages,
     isLoading,
     hasMore,
     loadMore,
     unreadCount: getUnreadCount(),
     markMessagesAsRead,
+    addMessage,
   };
 }

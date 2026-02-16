@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
+import { LoadScript } from "@react-google-maps/api";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -16,15 +18,30 @@ import CreateRide from "@/pages/CreateRide";
 import MyRides from "@/pages/MyRides";
 import Profile from "@/pages/Profile";
 import Chat from "@/pages/Chat";
+import Inbox from "@/pages/Inbox";
+import Settings from "@/pages/Settings";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import FAQ from "@/pages/FAQ";
+import HelpSupport from "@/pages/HelpSupport";
+import RideWaiting from "@/pages/RideWaiting";
+import RideTracking from "@/pages/RideTracking";
+import RideCompletion from "@/pages/RideCompletion";
+import RideRating from "@/pages/RideRating";
 import NotFound from "@/pages/not-found";
+import { ErrorTest } from "@/components/ErrorTest";
+
+// Load Google Maps libraries once for entire app
+const GOOGLE_MAPS_LIBRARIES: ("places" | "geometry")[] = ["places", "geometry"];
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 function ProtectedRoute({ component: Component, requireCompleteProfile = true, ...rest }: any) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAF9F4]">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FAF9F4] gap-4">
         <Loader2 className="animate-spin text-primary" size={32} />
+        <p className="text-primary font-medium">Loading please wait</p>
       </div>
     );
   }
@@ -56,6 +73,18 @@ function Router() {
       <Route path="/ride/:id">
         <ProtectedRoute component={RideDetails} />
       </Route>
+      <Route path="/ride/:bookingId/waiting">
+        <ProtectedRoute component={RideWaiting} />
+      </Route>
+      <Route path="/ride/:bookingId/tracking">
+        <ProtectedRoute component={RideTracking} />
+      </Route>
+      <Route path="/ride/:bookingId/complete">
+        <ProtectedRoute component={RideCompletion} />
+      </Route>
+      <Route path="/ride/:bookingId/rating">
+        <ProtectedRoute component={RideRating} />
+      </Route>
       <Route path="/create-ride">
         <ProtectedRoute component={CreateRide} />
       </Route>
@@ -65,8 +94,26 @@ function Router() {
       <Route path="/profile">
         <ProtectedRoute component={Profile} />
       </Route>
+      <Route path="/settings">
+        <ProtectedRoute component={Settings} />
+      </Route>
+      <Route path="/privacy">
+        <ProtectedRoute component={PrivacyPolicy} />
+      </Route>
+      <Route path="/faq">
+        <ProtectedRoute component={FAQ} />
+      </Route>
+      <Route path="/help-support">
+        <ProtectedRoute component={HelpSupport} />
+      </Route>
+      <Route path="/chat">
+        <ProtectedRoute component={Inbox} />
+      </Route>
       <Route path="/chat/:chatId">
         <ProtectedRoute component={Chat} />
+      </Route>
+      <Route path="/error-test">
+        <ProtectedRoute component={ErrorTest} />
       </Route>
       <Route component={NotFound} />
     </Switch>
@@ -77,8 +124,20 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        <LoadScript 
+          googleMapsApiKey={GOOGLE_MAPS_API_KEY} 
+          libraries={GOOGLE_MAPS_LIBRARIES}
+          loadingElement={
+            <div className="min-h-screen flex items-center justify-center bg-[#FAF9F4]">
+              <Loader2 className="animate-spin text-primary" size={32} />
+            </div>
+          }
+        >
+          <Toaster />
+          <ErrorBoundary>
+            <Router />
+          </ErrorBoundary>
+        </LoadScript>
       </TooltipProvider>
     </QueryClientProvider>
   );

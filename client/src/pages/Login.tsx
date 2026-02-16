@@ -49,7 +49,7 @@ export default function Login() {
         <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6 rotate-3">
           <Car size={40} className="text-primary" />
         </div>
-        <h1 className="text-3xl font-display font-bold text-foreground mb-2">Commute<span className="text-primary">Sync</span></h1>
+        <h1 className="text-3xl font-display font-bold text-foreground mb-2">OFFICE<span className="text-primary">RIDES</span></h1>
         <p className="text-muted-foreground">Share rides, save costs, travel better.</p>
       </div>
 

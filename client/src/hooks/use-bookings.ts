@@ -59,6 +59,9 @@ export function useBookings() {
             pricePerSeat: rideDoc.data().pricePerSeat,
             status: rideDoc.data().status,
             createdAt: rideDoc.data().createdAt?.toDate(),
+            routePolyline: rideDoc.data().routePolyline || "",
+            routeSteps: rideDoc.data().routeSteps || [],
+            routeRoads: rideDoc.data().routeRoads || [],
           } : undefined,
         });
       }
