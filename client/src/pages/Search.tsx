@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/ui/Layout";
 import { useRidesRealtime } from "@/hooks/use-rides-realtime";
+import { useAuth } from "@/hooks/use-auth";
 import { RideCard } from "@/components/RideCard";
 import { RideCardSkeleton } from "@/components/RideCardSkeleton";
-import { Loader2, MapPin, Calendar as CalendarIcon, Search as SearchIcon, X, Clock, ChevronRight } from "lucide-react";
+import { Loader2, MapPin, Calendar as CalendarIcon, Search as SearchIcon, X, Clock, ChevronRight, ArrowRightLeft } from "lucide-react";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
-import { GoogleMap, Marker, Polyline, Autocomplete } from "@react-google-maps/api";
+import { GoogleMap, Marker, Polyline, useJsApiLoader } from "@react-google-maps/api";
 import { haversineDistance, isPointNearPolyline, getDirections, reverseGeocode, decodePolyline } from "@/lib/utils";
 import { FirebaseRide, RouteOption } from "@/lib/types";
 import { getRecentFromSearches, getRecentToSearches, addRecentFromSearch, addRecentToSearch, type RecentSearch } from "@/lib/recentSearches";
@@ -23,9 +24,13 @@ type SearchFilters = {
   departureAMPM?: "AM" | "PM";
 };
 
+// Static libraries array to prevent LoadScript reload
+const googleMapsLibraries: ("places")[] = ["places"];
+
 export default function Search() {
   const [filters, setFilters] = useState<SearchFilters | undefined>();
   const { rides, loading: isLoading } = useRidesRealtime();
+  const { user } = useAuth();
   const { handleSubmit } = useForm<SearchFilters>();
 
   const [hasSearched, setHasSearched] = useState(false);
@@ -46,6 +51,12 @@ export default function Search() {
   const [showFromSuggestions, setShowFromSuggestions] = useState(false);
   const [showToSuggestions, setShowToSuggestions] = useState(false);
 
+  // Autocomplete suggestions
+  const [fromSuggestions, setFromSuggestions] = useState<any[]>([]);
+  const [toSuggestions, setToSuggestions] = useState<any[]>([]);
+  const [fromDropdownPos, setFromDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+  const [toDropdownPos, setToDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+
   // Date & time state
   const [departureDate, setDepartureDate] = useState<Date | undefined>(undefined);
   const [departureHour, setDepartureHour] = useState("09");
@@ -53,16 +64,214 @@ export default function Search() {
   const [departureAMPM, setDepartureAMPM] = useState<"AM" | "PM">("AM");
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
-  const directionsServiceRef = useRef<google.maps.DirectionsService | null>(null);
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries: googleMapsLibraries,
+  });
 
-  const originAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const destAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const directionsServiceRef = useRef<google.maps.DirectionsService | null>(null);
+  const fromAutocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const toAutocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const fromPlacesRef = useRef<google.maps.places.PlacesService | null>(null);
+  const toPlacesRef = useRef<google.maps.places.PlacesService | null>(null);
+  const fromInputRef = useRef<HTMLDivElement | null>(null);
+  const toInputRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const hiddenMapRef = useRef<google.maps.Map | null>(null);
+  const geocoderRef = useRef<google.maps.Geocoder | null>(null);
 
   // Load recent searches on mount
   useEffect(() => {
     setRecentFromSearches(getRecentFromSearches());
     setRecentToSearches(getRecentToSearches());
   }, []);
+
+  // Pre-populate origin and destination with user's home and office addresses
+  useEffect(() => {
+    if (user?.homeAddress) {
+      setOriginText(user.homeAddress);
+    }
+    if (user?.officeAddress) {
+      setDestText(user.officeAddress);
+    }
+  }, [user?.homeAddress, user?.officeAddress]);
+
+  // Geocode home and office addresses to get coordinates
+  useEffect(() => {
+    if (!geocoderRef.current || !user?.homeAddress || !user?.officeAddress) return;
+
+    const geocoder = geocoderRef.current;
+
+    // Geocode home address
+    if (user.homeAddress && !originLatLng) {
+      geocoder.geocode({ address: user.homeAddress }, (results, status) => {
+        if (status === "OK" && results?.[0]?.geometry?.location) {
+          setOriginLatLng({
+            lat: results[0].geometry.location.lat(),
+            lng: results[0].geometry.location.lng(),
+          });
+        }
+      });
+    }
+
+    // Geocode office address
+    if (user.officeAddress && !destLatLng) {
+      geocoder.geocode({ address: user.officeAddress }, (results, status) => {
+        if (status === "OK" && results?.[0]?.geometry?.location) {
+          setDestLatLng({
+            lat: results[0].geometry.location.lat(),
+            lng: results[0].geometry.location.lng(),
+          });
+        }
+      });
+    }
+  }, [user?.homeAddress, user?.officeAddress]);
+
+  // Initialize AutocompleteService for origin
+  useEffect(() => {
+    if (isLoaded && window.google) {
+      fromAutocompleteRef.current = new google.maps.places.AutocompleteService();
+    }
+  }, [isLoaded]);
+
+  // Initialize AutocompleteService for destination
+  useEffect(() => {
+    if (isLoaded && window.google) {
+      toAutocompleteRef.current = new google.maps.places.AutocompleteService();
+    }
+  }, [isLoaded]);
+
+  // Initialize PlacesService with hidden map when Google is ready
+  useEffect(() => {
+    if (isLoaded && window.google && !hiddenMapRef.current) {
+      // Create a hidden map element for PlacesService
+      const hiddenMapDiv = document.createElement('div');
+      hiddenMapDiv.style.display = 'none';
+      document.body.appendChild(hiddenMapDiv);
+
+      const hiddenMap = new google.maps.Map(hiddenMapDiv, {
+        center: { lat: 20.5937, lng: 78.9629 },
+        zoom: 5,
+      });
+
+      hiddenMapRef.current = hiddenMap;
+
+      // Initialize PlacesServices
+      if (!fromPlacesRef.current) {
+        fromPlacesRef.current = new google.maps.places.PlacesService(hiddenMap);
+      }
+      if (!toPlacesRef.current) {
+        toPlacesRef.current = new google.maps.places.PlacesService(hiddenMap);
+      }
+
+      // Initialize Geocoder
+      if (!geocoderRef.current) {
+        geocoderRef.current = new google.maps.Geocoder();
+      }
+    }
+  }, [isLoaded]);
+
+  // Handle origin text change with autocomplete
+  const handleOriginChange = async (input: string) => {
+    setOriginText(input);
+
+    if (fromInputRef.current) {
+      const rect = fromInputRef.current.getBoundingClientRect();
+      setFromDropdownPos({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+
+    if (input.length < 2 || !fromAutocompleteRef.current) {
+      setFromSuggestions([]);
+      return;
+    }
+
+    try {
+      const predictions = await fromAutocompleteRef.current.getPlacePredictions({
+        input,
+        componentRestrictions: { country: ["in"] },
+      });
+      setFromSuggestions(predictions.predictions || []);
+    } catch (error) {
+      console.error("Origin autocomplete error:", error);
+      setFromSuggestions([]);
+    }
+  };
+
+  // Handle destination text change with autocomplete
+  const handleDestinationChange = async (input: string) => {
+    setDestText(input);
+
+    if (toInputRef.current) {
+      const rect = toInputRef.current.getBoundingClientRect();
+      setToDropdownPos({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+
+    if (input.length < 2 || !toAutocompleteRef.current) {
+      setToSuggestions([]);
+      return;
+    }
+
+    try {
+      const predictions = await toAutocompleteRef.current.getPlacePredictions({
+        input,
+        componentRestrictions: { country: ["in"] },
+      });
+      setToSuggestions(predictions.predictions || []);
+    } catch (error) {
+      console.error("Destination autocomplete error:", error);
+      setToSuggestions([]);
+    }
+  };
+
+  // Handle origin suggestion selection
+  const handleSelectOriginSuggestion = (placeId: string, description: string, mainText: string) => {
+    if (!fromPlacesRef.current) return;
+
+    setOriginText(description);
+    setFromSuggestions([]);
+    setShowFromSuggestions(false);
+
+    fromPlacesRef.current.getDetails(
+      { placeId, fields: ["geometry"] },
+      (result, status) => {
+        if (status === "OK" && result?.geometry?.location) {
+          const latLng = { lat: result.geometry.location.lat(), lng: result.geometry.location.lng() };
+          setOriginLatLng(latLng);
+          addRecentFromSearch({ name: mainText || description, lat: latLng.lat, lng: latLng.lng });
+          setRecentFromSearches(getRecentFromSearches());
+        }
+      }
+    );
+  };
+
+  // Handle destination suggestion selection
+  const handleSelectDestinationSuggestion = (placeId: string, description: string, mainText: string) => {
+    if (!toPlacesRef.current) return;
+
+    setDestText(description);
+    setToSuggestions([]);
+    setShowToSuggestions(false);
+
+    toPlacesRef.current.getDetails(
+      { placeId, fields: ["geometry"] },
+      (result, status) => {
+        if (status === "OK" && result?.geometry?.location) {
+          const latLng = { lat: result.geometry.location.lat(), lng: result.geometry.location.lng() };
+          setDestLatLng(latLng);
+          addRecentToSearch({ name: mainText || description, lat: latLng.lat, lng: latLng.lng });
+          setRecentToSearches(getRecentToSearches());
+        }
+      }
+    );
+  };
 
   const getDepartureTime24h = () => {
     let hour = parseInt(departureHour);
@@ -144,6 +353,21 @@ export default function Search() {
     calculateRoute();
   }, [originLatLng, destLatLng]);
 
+  // Zoom map to fit route when both locations are selected
+  useEffect(() => {
+    if (route.length > 0 && mapRef.current) {
+      const bounds = new google.maps.LatLngBounds();
+      
+      // Add all route points to bounds
+      route.forEach((point) => {
+        bounds.extend({ lat: point.lat, lng: point.lng });
+      });
+
+      // Fit map to bounds with padding
+      mapRef.current.fitBounds(bounds, { top: 100, right: 100, bottom: 100, left: 100 });
+    }
+  }, [route]);
+
   // Scroll to results when search is completed
   useEffect(() => {
     if (hasSearched) {
@@ -162,6 +386,64 @@ export default function Search() {
     const decodedRoute = decodePolyline(selected.polyline);
     setRoute(decodedRoute);
   };
+
+  // Filter rides based on route match with passenger's route (300m tolerance)
+  const filterRidesByRoute = () => {
+    if (!filters || !filters.route || filters.route.length === 0) {
+      return rides; // Show all rides if no route selected
+    }
+
+    const TOLERANCE = 0.3; // 300 meters in km
+    const BUFFER = 0.01; // ~1km buffer for bounding box (0.009 degrees ≈ 1km)
+
+    // Get bounding box from route (fast pre-filter)
+    const getRouteBox = () => {
+      const lats = filters.route.map(p => p.lat);
+      const lngs = filters.route.map(p => p.lng);
+      
+      return {
+        minLat: Math.min(...lats) - BUFFER,
+        maxLat: Math.max(...lats) + BUFFER,
+        minLng: Math.min(...lngs) - BUFFER,
+        maxLng: Math.max(...lngs) + BUFFER,
+      };
+    };
+
+    const box = getRouteBox();
+
+    return rides.filter((ride: FirebaseRide) => {
+      if (!ride.originLatLng || !ride.destLatLng) {
+        return false; // Exclude rides without location data
+      }
+
+      // FAST CHECK 1: Is origin in bounding box?
+      const originInBox = 
+        ride.originLatLng.lat >= box.minLat && ride.originLatLng.lat <= box.maxLat &&
+        ride.originLatLng.lng >= box.minLng && ride.originLatLng.lng <= box.maxLng;
+
+      if (!originInBox) return false; // Skip expensive check if not in box
+
+      // FAST CHECK 2: Is destination in bounding box?
+      const destInBox =
+        ride.destLatLng.lat >= box.minLat && ride.destLatLng.lat <= box.maxLat &&
+        ride.destLatLng.lng >= box.minLng && ride.destLatLng.lng <= box.maxLng;
+
+      if (!destInBox) return false; // Skip expensive check if not in box
+
+      // EXPENSIVE CHECK (only runs for rides in bounding box):
+      // Check if driver's origin is near the passenger's route
+      const originNearRoute = isPointNearPolyline(ride.originLatLng, filters.route, TOLERANCE);
+      if (!originNearRoute) return false;
+
+      // Check if driver's destination is near the passenger's route
+      const destNearRoute = isPointNearPolyline(ride.destLatLng, filters.route, TOLERANCE);
+
+      // Both origin and destination must be on or near the passenger's route
+      return destNearRoute;
+    });
+  };
+
+  const filteredRides = filters ? filterRidesByRoute() : rides;
 
   const onSubmit = () => {
     if (originLatLng && destLatLng && departureDate) {
@@ -197,74 +479,142 @@ export default function Search() {
     setHasSearched(false);
   };
 
+  const handleReverseRoute = () => {
+    // Swap text
+    const tempText = originText;
+    setOriginText(destText);
+    setDestText(tempText);
+
+    // Swap coordinates
+    const tempLatLng = originLatLng;
+    setOriginLatLng(destLatLng);
+    setDestLatLng(tempLatLng);
+
+    // Clear suggestions
+    setFromSuggestions([]);
+    setToSuggestions([]);
+    setShowFromSuggestions(false);
+    setShowToSuggestions(false);
+  };
+
   return (
     <Layout headerTitle="Find a Ride" showNav={true}>
       <div className="px-4 py-6 space-y-6">
           {/* Search Form */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-border/50">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-4 gap-2">
               <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Select Route</h3>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                      async (position) => {
-                        const latLng = { lat: position.coords.latitude, lng: position.coords.longitude };
-                        setOriginLatLng(latLng);
-                        try {
-                          const address = await reverseGeocode(latLng.lat, latLng.lng);
-                          setOriginText(address);
-                        } catch (error) {
-                          console.error('Reverse geocoding failed:', error);
-                          setOriginText(`${latLng.lat.toFixed(6)}, ${latLng.lng.toFixed(6)}`);
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleReverseRoute}
+                  className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+                  title="Swap origin and destination"
+                >
+                  <ArrowRightLeft size={16} className="text-muted-foreground" />
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (navigator.geolocation) {
+                      navigator.geolocation.getCurrentPosition(
+                        async (position) => {
+                          const latLng = { lat: position.coords.latitude, lng: position.coords.longitude };
+                          setOriginLatLng(latLng);
+                          try {
+                            const address = await reverseGeocode(latLng.lat, latLng.lng);
+                            setOriginText(address);
+                          } catch (error) {
+                            console.error('Reverse geocoding failed:', error);
+                            setOriginText(`${latLng.lat.toFixed(6)}, ${latLng.lng.toFixed(6)}`);
+                          }
+                        },
+                        (error) => {
+                          console.error(error);
+                          alert('Unable to get location');
                         }
-                      },
-                      (error) => {
-                        console.error(error);
-                        alert('Unable to get location');
-                      }
-                    );
-                  } else {
-                    alert('Geolocation not supported');
-                  }
-                }}
-                className="px-3 py-1 bg-primary text-white text-xs rounded-lg"
-              >
-                Use My Location
-              </button>
+                      );
+                    } else {
+                      alert('Geolocation not supported');
+                    }
+                  }}
+                  className="px-3 py-1 bg-primary text-white text-xs rounded-lg"
+                >
+                  Use My Location
+                </button>
+              </div>
             </div>
             <div className="space-y-4 mb-4">
+                  {/* Origin Input */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Origin</label>
-                    <Autocomplete
-                      onLoad={(autocomplete) => (originAutocompleteRef.current = autocomplete)}
-                      onPlaceChanged={() => {
-                        const place = originAutocompleteRef.current?.getPlace();
-                        if (place?.geometry?.location) {
-                          const latLng = { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() };
-                          const displayName = place.name || (place.formatted_address ? place.formatted_address.split(',')[0] : '');
-                          setOriginLatLng(latLng);
-                          setOriginText(place.formatted_address || place.name || '');
-                          addRecentFromSearch({ name: displayName, lat: latLng.lat, lng: latLng.lng });
-                          setRecentFromSearches(getRecentFromSearches());
-                          setShowFromSuggestions(false);
-                        }
-                      }}
-                    >
+                    <div className="relative z-40" ref={fromInputRef}>
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        <SearchIcon size={18} />
+                      </div>
                       <input
                         type="text"
                         value={originText}
-                        onChange={(e) => setOriginText(e.target.value)}
+                        onChange={(e) => handleOriginChange(e.target.value)}
                         onFocus={() => setShowFromSuggestions(true)}
                         onBlur={() => setTimeout(() => setShowFromSuggestions(false), 200)}
                         placeholder="Enter pickup location"
-                        className="w-full bg-secondary rounded-lg px-3 py-2.5 outline-none text-sm border border-border/50 focus:border-primary transition-colors"
+                        className="w-full bg-secondary rounded-lg pl-10 pr-10 py-2.5 outline-none text-sm border border-border/50 focus:border-primary transition-colors"
                       />
-                    </Autocomplete>
-                    {/* Recent From Searches */}
-                    {showFromSuggestions && recentFromSearches.length > 0 && (
-                      <div className="absolute z-50 w-full max-w-sm mt-1 bg-white border border-border/50 rounded-lg shadow-lg overflow-hidden">
+                      {originText && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOriginText("");
+                            setOriginLatLng(null);
+                            setFromSuggestions([]);
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          <X size={18} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Origin Suggestions Dropdown */}
+                    {showFromSuggestions && fromSuggestions.length > 0 && (
+                      <div
+                        className="fixed z-50 bg-white border border-border/50 rounded-lg shadow-lg overflow-hidden"
+                        style={{
+                          top: `${fromDropdownPos.top}px`,
+                          left: `${fromDropdownPos.left}px`,
+                          width: `${fromDropdownPos.width}px`,
+                        }}
+                      >
+                        <div>
+                          {fromSuggestions.map((suggestion) => (
+                            <button
+                              key={suggestion.place_id}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleSelectOriginSuggestion(suggestion.place_id, suggestion.description, suggestion.main_text || suggestion.description);
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-secondary border-b border-border/30 last:border-0 transition-colors flex items-center gap-2"
+                            >
+                              <MapPin size={16} className="text-muted-foreground flex-shrink-0" />
+                              <span className="text-sm text-foreground">{suggestion.main_text || suggestion.description}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recent From Searches Dropdown */}
+                    {showFromSuggestions && fromSuggestions.length === 0 && recentFromSearches.length > 0 && (
+                      <div
+                        className="fixed z-50 bg-white border border-border/50 rounded-lg shadow-lg overflow-hidden"
+                        style={{
+                          top: `${fromDropdownPos.top}px`,
+                          left: `${fromDropdownPos.left}px`,
+                          width: `${fromDropdownPos.width}px`,
+                        }}
+                      >
                         <div className="bg-secondary px-4 py-2">
                           <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
                             <Clock size={12} /> Recent Pickups
@@ -275,52 +625,93 @@ export default function Search() {
                             <button
                               key={idx}
                               type="button"
-                              onClick={() => {
+                              onMouseDown={(e) => {
+                                e.preventDefault();
                                 setOriginLatLng({ lat: search.lat, lng: search.lng });
                                 setOriginText(search.name);
                                 setShowFromSuggestions(false);
                               }}
                               className="w-full text-left px-4 py-3 hover:bg-secondary border-b border-border/30 last:border-0 transition-colors flex items-center gap-2"
                             >
-                              <MapPin size={16} className="text-muted-foreground" />
-                              <span className="text-sm">{search.name}</span>
+                              <MapPin size={16} className="text-muted-foreground flex-shrink-0" />
+                              <span className="text-sm text-foreground">{search.name}</span>
                             </button>
                           ))}
                         </div>
                       </div>
                     )}
                   </div>
+
+                  {/* Destination Input */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">To</label>
-                    <Autocomplete
-                      onLoad={(autocomplete) => (destAutocompleteRef.current = autocomplete)}
-                      onPlaceChanged={() => {
-                        const place = destAutocompleteRef.current?.getPlace();
-                        if (place?.geometry?.location) {
-                          const latLng = { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() };
-                          const displayName = place.name || (place.formatted_address ? place.formatted_address.split(',')[0] : '');
-                          setDestLatLng(latLng);
-                          setDestText(place.formatted_address || place.name || '');
-                          addRecentToSearch({ name: displayName, lat: latLng.lat, lng: latLng.lng });
-                          setRecentToSearches(getRecentToSearches());
-                          setShowToSuggestions(false);
-                        }
-                      }}
-                    >
+                    <div className="relative z-40" ref={toInputRef}>
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        <SearchIcon size={18} />
+                      </div>
                       <input
                         type="text"
                         value={destText}
-                        onChange={(e) => setDestText(e.target.value)}
+                        onChange={(e) => handleDestinationChange(e.target.value)}
                         onFocus={() => setShowToSuggestions(true)}
                         onBlur={() => setTimeout(() => setShowToSuggestions(false), 200)}
                         placeholder="Enter dropoff location"
-                        className="w-full bg-secondary rounded-lg px-3 py-2.5 outline-none text-sm border border-border/50 focus:border-primary transition-colors"
+                        className="w-full bg-secondary rounded-lg pl-10 pr-10 py-2.5 outline-none text-sm border border-border/50 focus:border-primary transition-colors"
                       />
-                    </Autocomplete>
+                      {destText && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDestText("");
+                            setDestLatLng(null);
+                            setToSuggestions([]);
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          <X size={18} />
+                        </button>
+                      )}
+                    </div>
 
-                    {/* Recent To Searches */}
-                    {showToSuggestions && recentToSearches.length > 0 && (
-                      <div className="absolute z-50 w-full max-w-sm mt-1 bg-white border border-border/50 rounded-lg shadow-lg overflow-hidden">
+                    {/* Destination Suggestions Dropdown */}
+                    {showToSuggestions && toSuggestions.length > 0 && (
+                      <div
+                        className="fixed z-50 bg-white border border-border/50 rounded-lg shadow-lg overflow-hidden"
+                        style={{
+                          top: `${toDropdownPos.top}px`,
+                          left: `${toDropdownPos.left}px`,
+                          width: `${toDropdownPos.width}px`,
+                        }}
+                      >
+                        <div>
+                          {toSuggestions.map((suggestion) => (
+                            <button
+                              key={suggestion.place_id}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleSelectDestinationSuggestion(suggestion.place_id, suggestion.description, suggestion.main_text || suggestion.description);
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-secondary border-b border-border/30 last:border-0 transition-colors flex items-center gap-2"
+                            >
+                              <MapPin size={16} className="text-muted-foreground flex-shrink-0" />
+                              <span className="text-sm text-foreground">{suggestion.main_text || suggestion.description}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Recent To Searches Dropdown */}
+                    {showToSuggestions && toSuggestions.length === 0 && recentToSearches.length > 0 && (
+                      <div
+                        className="fixed z-50 bg-white border border-border/50 rounded-lg shadow-lg overflow-hidden"
+                        style={{
+                          top: `${toDropdownPos.top}px`,
+                          left: `${toDropdownPos.left}px`,
+                          width: `${toDropdownPos.width}px`,
+                        }}
+                      >
                         <div className="bg-secondary px-4 py-2">
                           <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
                             <Clock size={12} /> Recent Dropoffs
@@ -331,15 +722,16 @@ export default function Search() {
                             <button
                               key={idx}
                               type="button"
-                              onClick={() => {
+                              onMouseDown={(e) => {
+                                e.preventDefault();
                                 setDestLatLng({ lat: search.lat, lng: search.lng });
                                 setDestText(search.name);
                                 setShowToSuggestions(false);
                               }}
                               className="w-full text-left px-4 py-3 hover:bg-secondary border-b border-border/30 last:border-0 transition-colors flex items-center gap-2"
                             >
-                              <MapPin size={16} className="text-muted-foreground" />
-                              <span className="text-sm">{search.name}</span>
+                              <MapPin size={16} className="text-muted-foreground flex-shrink-0" />
+                              <span className="text-sm text-foreground">{search.name}</span>
                             </button>
                           ))}
                         </div>
@@ -368,6 +760,9 @@ export default function Search() {
                             setRoute([originLatLng, latLng]);
                             });
                           }
+                        }}
+                        onLoad={(map) => {
+                          mapRef.current = map;
                         }}
                         mapContainerStyle={{ height: '100%', width: '100%' }}
                       >
@@ -526,9 +921,9 @@ export default function Search() {
                 <RideCardSkeleton />
                 <RideCardSkeleton />
               </div>
-            ) : rides && rides.length > 0 ? (
+            ) : filteredRides && filteredRides.length > 0 ? (
               <div className="space-y-4 pb-20">
-                {rides.map((ride: FirebaseRide) => (
+                {filteredRides.map((ride: FirebaseRide) => (
                   <RideCard key={ride.id} ride={ride} />
                 ))}
               </div>

@@ -1,6 +1,7 @@
 import { Layout } from "@/components/ui/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useRidesRealtime } from "@/hooks/use-rides-realtime";
+import { useDriverRidesRealtime } from "@/hooks/use-driver-rides-realtime";
 import { useBookings } from "@/hooks/use-bookings";
 import { useBookingsRealtime } from "@/hooks/use-bookings-realtime";
 import { RideCard } from "@/components/RideCard";
@@ -14,12 +15,20 @@ import { db } from "@/lib/firebase";
 export default function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const { rides, loading } = useRidesRealtime(user?.role === 'driver' ? { driverId: user?.uid } : undefined);
+  
+  // Use dedicated driver rides hook for drivers
+  const { rides: driverRides, loading: driverLoading } = useDriverRidesRealtime();
+  const { rides: passengerRides, loading: passengerLoading } = useRidesRealtime();
+  
   const { data: bookings } = useBookings();
   const { bookings: realtimeBookings } = useBookingsRealtime();
   const [rideBookingMap, setRideBookingMap] = useState<{ [rideId: string]: string }>({});
   
   const isDriver = user?.role === 'driver';
+  
+  // Select rides based on user role
+  const rides = isDriver ? driverRides : passengerRides;
+  const loading = isDriver ? driverLoading : passengerLoading;
 
   // Fetch first booking ID for each ride (for drivers)
   useEffect(() => {

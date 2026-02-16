@@ -100,21 +100,20 @@ export default function Welcome() {
     return () => clearInterval(interval);
   }, [slides.length]);
 
-  // Redirect if already logged in
-  useEffect(() => {
-    if (user) {
-      setLocation("/home");
-    }
-  }, [user, setLocation]);
-
   // Show loading spinner while checking auth
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FAF9F4]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="text-primary font-medium">Loading...</p>
+        </div>
       </div>
     );
   }
+
+  // Don't redirect here - let Login.tsx and Register.tsx handle redirects after successful auth
+  // This page is only shown when fully logged out
 
   return (
     <div className="h-screen bg-gradient-to-br from-[#FAF9F4] to-primary/5 flex flex-col relative overflow-hidden">

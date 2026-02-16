@@ -35,13 +35,14 @@ const GOOGLE_MAPS_LIBRARIES: ("places" | "geometry")[] = ["places", "geometry"];
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 function ProtectedRoute({ component: Component, requireCompleteProfile = true, ...rest }: any) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, error } = useAuth();
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#FAF9F4] gap-4">
         <Loader2 className="animate-spin text-primary" size={32} />
         <p className="text-primary font-medium">Loading please wait</p>
+        {error && <p className="text-red-600 text-sm text-center px-4">{error}</p>}
       </div>
     );
   }

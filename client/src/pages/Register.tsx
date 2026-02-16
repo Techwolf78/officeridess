@@ -4,9 +4,10 @@ import { z } from "zod";
 import { Layout } from "@/components/ui/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
-import { Loader2, Car, ArrowRight, User, MapPin } from "lucide-react";
+import { Loader2, Car, ArrowRight, User, MapPin, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
+import { LocationInput } from "@/components/LocationInput";
 
 const step1Schema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
@@ -24,10 +25,12 @@ type Step1Form = z.infer<typeof step1Schema>;
 type Step2Form = z.infer<typeof step2Schema>;
 
 export default function Register() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, isLoading } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+  const [showError, setShowError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const step1Form = useForm<Step1Form>({
     resolver: zodResolver(step1Schema),
@@ -39,12 +42,14 @@ export default function Register() {
 
   // Redirect if already registered or not logged in
   useEffect(() => {
-    if (!user) {
-      setLocation("/login");
-    } else if (user.firstName) {
-      setLocation("/");
+    if (!isLoading) {
+      if (!user) {
+        setLocation("/login");
+      } else if (user.firstName) {
+        setLocation("/home");
+      }
     }
-  }, [user, setLocation]);
+  }, [user, isLoading, setLocation]);
 
   const onStep1Submit = (data: Step1Form) => {
     // Store step 1 data temporarily and move to step 2
@@ -53,6 +58,7 @@ export default function Register() {
   };
 
   const onStep2Submit = (data: Step2Form) => {
+    setShowError(false);
     const step1Data = JSON.parse(localStorage.getItem('registration_step1') || '{}');
 
     const completeProfile = {
@@ -62,7 +68,7 @@ export default function Register() {
       gender: step1Data.gender,
       homeAddress: data.homeAddress,
       officeAddress: data.officeAddress,
-      phoneNumber: user?.phoneNumber, // Store the phone number
+      phoneNumber: user?.phoneNumber,
     };
 
     updateProfile.mutate(completeProfile, {
@@ -72,17 +78,33 @@ export default function Register() {
           title: "Welcome to OFFICERIDES!",
           description: "Your profile has been set up successfully.",
         });
-        setLocation("/");
+        // Navigation will happen automatically when user state updates
+        setLocation("/home");
       },
       onError: (err) => {
+        const errorMsg = err instanceof Error ? err.message : "Failed to complete profile setup. Please try again.";
+        setErrorMessage(errorMsg);
+        setShowError(true);
         toast({
           title: "Error",
-          description: err.message,
+          description: errorMsg,
           variant: "destructive",
         });
       },
     });
   };
+
+  // Show loading while checking auth status
+  if (isLoading) {
+    return (
+      <Layout headerTitle="Complete Your Profile">
+        <div className="flex flex-col items-center justify-center min-h-screen gap-4 py-8">
+          <Loader2 className="animate-spin text-primary" size={32} />
+          <p className="text-primary font-medium">Loading please wait...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout headerTitle={`Complete Your Profile (${currentStep}/2)`}>
@@ -189,39 +211,57 @@ export default function Register() {
           </form>
         ) : (
           <form onSubmit={step2Form.handleSubmit(onStep2Submit)} className="space-y-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground ml-1">Home Address</label>
-                <input
-                  type="text"
-                  placeholder="Enter your complete home address"
-                  {...step2Form.register("homeAddress")}
-                  className="w-full px-4 py-3.5 bg-secondary rounded-xl border-transparent focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none"
-                />
-                {step2Form.formState.errors.homeAddress && (
-                  <p className="text-red-500 text-xs ml-1">{step2Form.formState.errors.homeAddress.message}</p>
-                )}
+            {showError && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex gap-3">
+                <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-red-800 font-medium text-sm">Profile Setup Failed</p>
+                  <p className="text-red-700 text-sm mt-1">{errorMessage}</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowError(false)}
+                    className="text-red-600 text-xs mt-2 underline hover:no-underline"
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
+            )}
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground ml-1">Office Address</label>
-                <input
-                  type="text"
-                  placeholder="Enter your complete office address"
-                  {...step2Form.register("officeAddress")}
-                  className="w-full px-4 py-3.5 bg-secondary rounded-xl border-transparent focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none"
-                />
-                {step2Form.formState.errors.officeAddress && (
-                  <p className="text-red-500 text-xs ml-1">{step2Form.formState.errors.officeAddress.message}</p>
-                )}
-              </div>
+            <div className="space-y-4">
+              <LocationInput
+                value={step2Form.watch("homeAddress")}
+                onChange={(address) => {
+                  step2Form.setValue("homeAddress", address);
+                  step2Form.trigger("homeAddress");
+                }}
+                placeholder="Search or select your home address"
+                label="Home Address"
+              />
+              {step2Form.formState.errors.homeAddress && (
+                <p className="text-red-500 text-xs ml-1">{step2Form.formState.errors.homeAddress.message}</p>
+              )}
+
+              <LocationInput
+                value={step2Form.watch("officeAddress")}
+                onChange={(address) => {
+                  step2Form.setValue("officeAddress", address);
+                  step2Form.trigger("officeAddress");
+                }}
+                placeholder="Search or select your office address"
+                label="Office Address"
+              />
+              {step2Form.formState.errors.officeAddress && (
+                <p className="text-red-500 text-xs ml-1">{step2Form.formState.errors.officeAddress.message}</p>
+              )}
             </div>
 
             <div className="flex gap-4">
               <button
                 type="button"
                 onClick={() => setCurrentStep(1)}
-                className="flex-1 py-3.5 bg-secondary hover:bg-secondary/80 text-foreground rounded-xl font-semibold transition-all"
+                disabled={updateProfile.isPending}
+                className="flex-1 py-3.5 bg-secondary hover:bg-secondary/80 text-foreground rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Back
               </button>

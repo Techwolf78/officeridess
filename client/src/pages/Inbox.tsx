@@ -15,6 +15,20 @@ export default function Inbox() {
   const { chats, loading: chatsLoading } = useChatRealtime();
   const [, setLocation] = useLocation();
   const [allUsersLoaded, setAllUsersLoaded] = useState(false);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  // Set timeout for loading skeleton (10 seconds)
+  useEffect(() => {
+    if (!chatsLoading && allUsersLoaded) {
+      return; // Data loaded successfully, clear timeout
+    }
+
+    const timeoutId = setTimeout(() => {
+      setLoadingTimeout(true);
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(timeoutId);
+  }, [chatsLoading, allUsersLoaded]);
 
   // Sort chats by last message time
   const sortedChats = [...chats].sort((a, b) => {
@@ -51,14 +65,14 @@ export default function Inbox() {
     checkAllUsersLoaded();
   }, [chatsLoading, sortedChats, user?.uid]);
 
-  // Show skeleton loaders until all data is loaded
-  if (chatsLoading || !allUsersLoaded) {
+  // Show skeleton loaders until all data is loaded (but not if timeout reached)
+  if ((chatsLoading || !allUsersLoaded) && !loadingTimeout) {
     return (
       <Layout headerTitle="Inbox" showNav={true}>
         <div className="flex flex-col h-full">
           <div className="divide-y">
             {/* WhatsApp-like skeleton loaders */}
-            {Array.from({ length: Math.max(6, sortedChats.length) }).map((_, index) => (
+            {Array.from({ length: Math.max(10, sortedChats.length) }).map((_, index) => (
               <ChatSkeleton key={index} />
             ))}
           </div>
