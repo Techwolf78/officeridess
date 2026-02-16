@@ -67,7 +67,7 @@ export default function FAQ() {
 
   return (
     <Layout headerTitle="FAQ" showNav={true}>
-      <div className="px-4 py-6 pb-24 max-w-2xl mx-auto">
+      <div className="px-4 py-6 pb-24 max-w-2xl mx-auto font-sans">
         <Link href="/settings">
           <button className="flex items-center gap-2 text-primary hover:text-primary/80 mb-6 cursor-pointer transition-colors">
             <ArrowLeft size={20} />
@@ -75,25 +75,25 @@ export default function FAQ() {
           </button>
         </Link>
 
-        <div className="space-y-3">
+        <div className="bg-white rounded-2xl shadow-sm border border-border/50 overflow-hidden divide-y divide-border/50">
           {faqs.map((item) => (
-            <div key={item.id} className="bg-white rounded-2xl border border-border/50 overflow-hidden">
+            <div key={item.id}>
               <button
                 onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
-                className="w-full p-4 flex items-center justify-between hover:bg-secondary/30 transition-colors text-left focus:outline-none"
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-secondary/30 transition-colors text-left"
               >
-                <h3 className="font-semibold text-foreground text-sm pr-4">{item.question}</h3>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{item.question}</p>
+                </div>
                 <ChevronDown
-                  size={20}
-                  className={`text-primary flex-shrink-0 transition-transform ${
-                    expandedId === item.id ? "rotate-180" : ""
-                  }`}
+                  size={18}
+                  className={`text-muted-foreground flex-shrink-0 transition-transform ${expandedId === item.id ? 'rotate-180' : ''}`}
                 />
               </button>
 
               {expandedId === item.id && (
-                <div className="px-4 py-3 border-t border-border/50 bg-secondary/10">
-                  <p className="text-sm text-muted-foreground leading-relaxed">{item.answer}</p>
+                <div className="px-4 py-2 bg-secondary/10 text-xs text-muted-foreground">
+                  {item.answer}
                 </div>
               )}
             </div>
