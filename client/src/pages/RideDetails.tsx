@@ -124,11 +124,12 @@ export default function RideDetails() {
           <div className="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary via-transparent to-transparent"></div>
         )}
         <div className="absolute top-6 left-6 z-10">
-          <Link href="/">
-            <button className="bg-white/90 backdrop-blur rounded-full p-2 shadow-sm hover:bg-white transition-colors">
-              <ArrowLeft size={20} className="text-foreground" />
-            </button>
-          </Link>
+          <button
+            onClick={() => window.history.back()}
+            className="bg-white/90 backdrop-blur rounded-full p-2 shadow-sm hover:bg-white transition-colors"
+          >
+            <ArrowLeft size={20} className="text-foreground" />
+          </button>
         </div>
       </div>
 

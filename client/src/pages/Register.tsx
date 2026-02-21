@@ -231,7 +231,7 @@ export default function Register() {
             <div className="space-y-4">
               <LocationInput
                 value={step2Form.watch("homeAddress")}
-                onChange={(address) => {
+                onChange={(address, lat, lng) => {
                   step2Form.setValue("homeAddress", address);
                   step2Form.trigger("homeAddress");
                 }}
@@ -244,7 +244,7 @@ export default function Register() {
 
               <LocationInput
                 value={step2Form.watch("officeAddress")}
-                onChange={(address) => {
+                onChange={(address, lat, lng) => {
                   step2Form.setValue("officeAddress", address);
                   step2Form.trigger("officeAddress");
                 }}

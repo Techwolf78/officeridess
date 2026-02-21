@@ -42,10 +42,10 @@ export function LocationInput({ value, onChange, placeholder, label }: LocationI
     libraries: googleMapsLibraries,
   });
 
-  // Load recent locations on mount
+  // Sync searchInput with value prop
   useEffect(() => {
-    setRecentLocations(getRecentFromSearches());
-  }, []);
+    setSearchInput(value);
+  }, [value]);
 
   // Initialize Places Services
   useEffect(() => {

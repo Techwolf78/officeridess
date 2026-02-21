@@ -11,6 +11,7 @@ import { Link, useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { FirebaseRide } from "@/lib/types";
 
 export default function Home() {
   const { user } = useAuth();
@@ -29,6 +30,37 @@ export default function Home() {
   // Select rides based on user role
   const rides = isDriver ? driverRides : passengerRides;
   const loading = isDriver ? driverLoading : passengerLoading;
+
+  // Helper function to determine if "I've Arrived" button should appear
+  const shouldShowArrivedButton = (ride: FirebaseRide, hasBooking: boolean): boolean => {
+    // Rules for showing the button:
+    // 1. User must be a driver (handled by parent condition)
+    // 2. Ride status must be 'scheduled' or 'in_progress'
+    if (!['scheduled', 'in_progress'].includes(ride.status)) return false;
+
+    // 3. Ride must have at least one confirmed booking
+    if (!hasBooking) return false;
+
+    // 4. Current date must match ride departure date
+    const now = new Date();
+    const rideDate = new Date(ride.departureTime);
+    
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+    
+    const rideDateOnly = new Date(rideDate);
+    rideDateOnly.setHours(0, 0, 0, 0);
+    
+    if (rideDateOnly.getTime() !== todayStart.getTime()) return false;
+
+    // 5. Current time must be within 1 hour before or after ride departure
+    const timeDiffMinutes = Math.abs(now.getTime() - rideDate.getTime()) / (1000 * 60);
+    if (timeDiffMinutes > 60) return false;
+
+    return true;
+  };
 
   // Fetch first booking ID for each ride (for drivers)
   useEffect(() => {
@@ -136,6 +168,7 @@ export default function Home() {
               activeRides.map((ride) => {
                 // Get corresponding booking for this ride (for passengers)
                 const booking = !isDriver ? realtimeBookings?.find(b => b.rideId === ride.id && b.status !== 'cancelled') : null;
+                const hasBooking = !!rideBookingMap[ride.id];
                 
                 return (
                   <div key={ride.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-border/50 hover:shadow-md transition-all">
@@ -144,7 +177,7 @@ export default function Home() {
                     </div>
 
                     {/* Driver Action Panel - I've Arrived Button */}
-                    {isDriver && ride.status === 'scheduled' && rideBookingMap[ride.id] && (
+                    {isDriver && shouldShowArrivedButton(ride, hasBooking) && (
                       <div className="border-t border-border/50 p-3">
                         <button
                           onClick={() => setLocation(`/ride/${rideBookingMap[ride.id]}/waiting`)}

@@ -14,6 +14,9 @@ export interface FirebaseUser {
   officeAddress?: string;
   profileImage?: string;
   createdAt: Date;
+  // New aggregated rating fields for search
+  averageRating?: number;
+  totalRatings?: number;
 }
 
 export interface FirebaseVehicle {
@@ -50,6 +53,20 @@ export interface FirebaseRide {
   eta: number; // estimated time in minutes
   originDisplayName?: string; // Shortened display name for origin
   destDisplayName?: string;   // Shortened display name for destination
+  // New BlaBlaCar-style fields
+  preferences?: {
+    smoking: boolean;
+    pets: boolean;
+    music: boolean;
+    ac: boolean;
+  };
+  vehicleComfort: 'basic' | 'comfort' | 'premium';
+  instantBooking: boolean;
+  returnTrip?: {
+    date: Date;
+    time: string;
+  };
+  driverRating?: number; // aggregated rating
   // Populated fields
   driver?: FirebaseUser;
   vehicle?: FirebaseVehicle;
@@ -141,6 +158,9 @@ export const firebaseUserSchema = z.object({
   officeAddress: z.string().optional(),
   profileImage: z.string().optional(),
   createdAt: z.date(),
+  // New aggregated rating fields for search
+  averageRating: z.number().min(0).max(5).optional(),
+  totalRatings: z.number().min(0).optional(),
 });
 
 export const firebaseVehicleSchema = z.object({
@@ -174,6 +194,20 @@ export const firebaseRideSchema = z.object({
   stops: z.array(z.object({ lat: z.number(), lng: z.number() })),
   distance: z.number(),
   eta: z.number(),
+  // New BlaBlaCar-style fields
+  preferences: z.object({
+    smoking: z.boolean(),
+    pets: z.boolean(),
+    music: z.boolean(),
+    ac: z.boolean(),
+  }).optional(),
+  vehicleComfort: z.enum(['basic', 'comfort', 'premium']),
+  instantBooking: z.boolean(),
+  returnTrip: z.object({
+    date: z.date(),
+    time: z.string(),
+  }).optional(),
+  driverRating: z.number().min(0).max(5).optional(),
 });
 
 export const firebaseBookingSchema = z.object({

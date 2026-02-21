@@ -4,15 +4,19 @@ import { useRidesRealtime } from "@/hooks/use-rides-realtime";
 import { useAuth } from "@/hooks/use-auth";
 import { RideCard } from "@/components/RideCard";
 import { RideCardSkeleton } from "@/components/RideCardSkeleton";
-import { Loader2, MapPin, Calendar as CalendarIcon, Search as SearchIcon, X, Clock, ChevronRight, ArrowRightLeft } from "lucide-react";
+import { Loader2, MapPin, Calendar as CalendarIcon, Search as SearchIcon, X, Clock, ChevronRight, ArrowRightLeft, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { GoogleMap, Marker, Polyline, useJsApiLoader } from "@react-google-maps/api";
-import { haversineDistance, isPointNearPolyline, getDirections, reverseGeocode, decodePolyline } from "@/lib/utils";
+import { haversineDistance, isPointNearPolylineFlexible, doesRouteOverlapFlexible, canAccommodateStops, calculateRouteOverlapScore, decodePolyline, reverseGeocode, getDirections } from "@/lib/utils";
 import { FirebaseRide, RouteOption } from "@/lib/types";
 import { getRecentFromSearches, getRecentToSearches, addRecentFromSearch, addRecentToSearch, type RecentSearch } from "@/lib/recentSearches";
 import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { SearchFiltersPanel, type SearchFilters as AdvancedFilters } from "@/components/SearchFilters";
 
 type SearchFilters = {
   originLatLng: { lat: number; lng: number };
@@ -29,7 +33,27 @@ const googleMapsLibraries: ("places")[] = ["places"];
 
 export default function Search() {
   const [filters, setFilters] = useState<SearchFilters | undefined>();
-  const { rides, loading: isLoading } = useRidesRealtime();
+  
+  // Advanced filters - declare first before using
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({});
+  
+  const { rides, loading: isLoading } = useRidesRealtime({
+    minPrice: advancedFilters.minPrice,
+    maxPrice: advancedFilters.maxPrice,
+    minSeats: advancedFilters.minSeats,
+    verifiedDriversOnly: advancedFilters.verifiedDriversOnly,
+    vehicleComfort: advancedFilters.vehicleComfort,
+    minRating: advancedFilters.minRating,
+    instantBookingOnly: advancedFilters.instantBookingOnly,
+    preferences: advancedFilters.smoking !== undefined || advancedFilters.pets !== undefined ||
+                advancedFilters.music !== undefined || advancedFilters.ac !== undefined ? {
+      smoking: advancedFilters.smoking,
+      pets: advancedFilters.pets,
+      music: advancedFilters.music,
+      ac: advancedFilters.ac,
+    } : undefined,
+    sortBy: advancedFilters.sortBy,
+  });
   const { user } = useAuth();
   const { handleSubmit } = useForm<SearchFilters>();
 
@@ -63,6 +87,20 @@ export default function Search() {
   const [departureMinute, setDepartureMinute] = useState("00");
   const [departureAMPM, setDepartureAMPM] = useState<"AM" | "PM">("AM");
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+
+  // Enhanced time filtering
+  const [timeWindow, setTimeWindow] = useState<'anytime' | 'morning' | 'afternoon' | 'evening' | 'exact'>('anytime');
+  const [dateFlexibility, setDateFlexibility] = useState<'exact' | 'flexible'>('flexible');
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10); // Show 10 rides per page
+
+  // Loading states
+  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
+  
+  // Filter panel visibility
+  const [showFilters, setShowFilters] = useState(false);
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
@@ -280,6 +318,43 @@ export default function Search() {
     return `${String(hour).padStart(2, '0')}:${departureMinute}`;
   };
 
+  // Enhanced time filtering helpers
+  const getTimeWindowRange = (window: 'morning' | 'afternoon' | 'evening'): { start: number; end: number } => {
+    switch (window) {
+      case 'morning': return { start: 6, end: 12 }; // 6 AM - 12 PM
+      case 'afternoon': return { start: 12, end: 18 }; // 12 PM - 6 PM
+      case 'evening': return { start: 18, end: 24 }; // 6 PM - 12 AM
+      default: return { start: 0, end: 24 };
+    }
+  };
+
+  const isRideInTimeWindow = (rideTime: Date, window: 'anytime' | 'morning' | 'afternoon' | 'evening' | 'exact', searchTime?: Date): boolean => {
+    if (window === 'anytime') return true;
+    if (window === 'exact' && searchTime) {
+      // Within 2 hours of exact time
+      const timeDiff = Math.abs(rideTime.getTime() - searchTime.getTime());
+      return timeDiff <= (2 * 60 * 60 * 1000); // 2 hours
+    }
+
+    // For morning, afternoon, evening windows
+    if (window === 'exact' || !searchTime) return true; // If exact time but no searchTime, allow all
+    
+    const hour = rideTime.getHours();
+    const range = getTimeWindowRange(window as 'morning' | 'afternoon' | 'evening');
+    return hour >= range.start && hour < range.end;
+  };
+
+  const isRideInDateRange = (rideDate: Date, searchDate: Date, flexibility: 'exact' | 'flexible'): boolean => {
+    if (flexibility === 'exact') {
+      // Same day
+      return rideDate.toDateString() === searchDate.toDateString();
+    } else {
+      // Within 24 hours (flexible)
+      const timeDiff = Math.abs(rideDate.getTime() - searchDate.getTime());
+      return timeDiff <= (24 * 60 * 60 * 1000); // 24 hours
+    }
+  };
+
   const calculateRoute = async () => {
     if (!originLatLng || !destLatLng) return;
     
@@ -387,63 +462,81 @@ export default function Search() {
     setRoute(decodedRoute);
   };
 
-  // Filter rides based on route match with passenger's route (300m tolerance)
+  // Filter rides based on flexible route matching (BlaBlaCar-style: 5-10km tolerance)
   const filterRidesByRoute = () => {
     if (!filters || !filters.route || filters.route.length === 0) {
       return rides; // Show all rides if no route selected
     }
 
-    const TOLERANCE = 0.3; // 300 meters in km
-    const BUFFER = 0.01; // ~1km buffer for bounding box (0.009 degrees ≈ 1km)
-
-    // Get bounding box from route (fast pre-filter)
-    const getRouteBox = () => {
-      const lats = filters.route.map(p => p.lat);
-      const lngs = filters.route.map(p => p.lng);
-      
-      return {
-        minLat: Math.min(...lats) - BUFFER,
-        maxLat: Math.max(...lats) + BUFFER,
-        minLng: Math.min(...lngs) - BUFFER,
-        maxLng: Math.max(...lngs) + BUFFER,
-      };
-    };
-
-    const box = getRouteBox();
+    const FLEXIBLE_TOLERANCE_KM = 5; // 5km tolerance for flexible matching
+    const MIN_OVERLAP_SCORE = 0.5; // Minimum 50% route overlap score
 
     return rides.filter((ride: FirebaseRide) => {
       if (!ride.originLatLng || !ride.destLatLng) {
         return false; // Exclude rides without location data
       }
 
-      // FAST CHECK 1: Is origin in bounding box?
-      const originInBox = 
-        ride.originLatLng.lat >= box.minLat && ride.originLatLng.lat <= box.maxLat &&
-        ride.originLatLng.lng >= box.minLng && ride.originLatLng.lng <= box.maxLng;
+// ENHANCED DATE/TIME FILTERING: BlaBlaCar-style flexible time windows
+      if (filters.departureDate) {
+        const rideDate = new Date(ride.departureTime);
+        const searchDate = new Date(filters.departureDate);
 
-      if (!originInBox) return false; // Skip expensive check if not in box
+        // Check date range (exact day or flexible 24-hour window)
+        const dateMatches = isRideInDateRange(rideDate, searchDate, dateFlexibility);
+        if (!dateMatches) return false;
 
-      // FAST CHECK 2: Is destination in bounding box?
-      const destInBox =
-        ride.destLatLng.lat >= box.minLat && ride.destLatLng.lat <= box.maxLat &&
-        ride.destLatLng.lng >= box.minLng && ride.destLatLng.lng <= box.maxLng;
+        // Check time window (morning/afternoon/evening or exact time)
+        const timeMatches = isRideInTimeWindow(rideDate, timeWindow, searchDate);
+        if (!timeMatches) return false;
+      }
 
-      if (!destInBox) return false; // Skip expensive check if not in box
+      // FLEXIBLE ROUTE MATCHING: Use BlaBlaCar-style overlap detection
+      const routeOverlaps = doesRouteOverlapFlexible(
+        filters.originLatLng,
+        filters.destLatLng,
+        ride.route || [],
+        MIN_OVERLAP_SCORE
+      );
 
-      // EXPENSIVE CHECK (only runs for rides in bounding box):
-      // Check if driver's origin is near the passenger's route
-      const originNearRoute = isPointNearPolyline(ride.originLatLng, filters.route, TOLERANCE);
-      if (!originNearRoute) return false;
+      if (!routeOverlaps) return false;
 
-      // Check if driver's destination is near the passenger's route
-      const destNearRoute = isPointNearPolyline(ride.destLatLng, filters.route, TOLERANCE);
+      // Check intermediate stops compatibility if ride has stops
+      if (ride.stops && ride.stops.length > 0) {
+        const stopsCompatible = canAccommodateStops(
+          filters.originLatLng,
+          filters.destLatLng,
+          ride.stops
+        );
+        if (!stopsCompatible) return false;
+      }
 
-      // Both origin and destination must be on or near the passenger's route
-      return destNearRoute;
+      // Calculate route match quality score (could be used for sorting later)
+      const matchScore = calculateRouteOverlapScore(
+        filters.originLatLng,
+        filters.destLatLng,
+        ride.route || []
+      );
+
+      // For now, just ensure minimum overlap - future enhancement could sort by score
+      return matchScore >= MIN_OVERLAP_SCORE;
     });
   };
 
   const filteredRides = filters ? filterRidesByRoute() : rides;
+
+  // Pagination logic
+  const totalRides = filteredRides?.length || 0;
+  const totalPages = Math.ceil(totalRides / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedRides = filteredRides?.slice(startIndex, endIndex) || [];
+
+  const handleFiltersChange = (newFilters: AdvancedFilters) => {
+    setIsApplyingFilters(true);
+    setAdvancedFilters(newFilters);
+    // Reset loading state after a short delay to simulate filter application
+    setTimeout(() => setIsApplyingFilters(false), 100);
+  };
 
   const onSubmit = () => {
     if (originLatLng && destLatLng && departureDate) {
@@ -913,24 +1006,87 @@ export default function Search() {
         {/* Results */}
         {hasSearched && (
           <div id="available-rides-section">
-            <h3 className="font-display font-bold mb-4 flex items-center gap-2">
-              Available Rides
-              {filters && <span className="text-xs font-normal text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">Filtered</span>}
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold flex items-center gap-2">
+                Available Rides
+                {filters && <span className="text-xs font-normal text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">Filtered</span>}
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(true)}
+                className="flex items-center gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                <span className="hidden sm:inline">Filters</span>
+                <span className="sm:hidden">Filter</span>
+                {Object.values(advancedFilters).filter(value =>
+                  value !== undefined && value !== null && value !== false && value !== ''
+                ).length > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-4 w-4 p-0 text-xs">
+                    {Object.values(advancedFilters).filter(value =>
+                      value !== undefined && value !== null && value !== false && value !== ''
+                    ).length}
+                  </Badge>
+                )}
+              </Button>
+            </div>
 
-            {isLoading ? (
+            {isLoading || isApplyingFilters ? (
               <div className="space-y-4 pb-20">
-                <RideCardSkeleton />
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-primary" />
+                  <p className="text-sm text-muted-foreground">
+                    {isApplyingFilters ? "Applying filters..." : "Searching for rides..."}
+                  </p>
+                </div>
                 <RideCardSkeleton />
                 <RideCardSkeleton />
                 <RideCardSkeleton />
               </div>
-            ) : filteredRides && filteredRides.length > 0 ? (
-              <div className="space-y-4 pb-20">
-                {filteredRides.map((ride: FirebaseRide) => (
-                  <RideCard key={ride.id} ride={ride} />
-                ))}
-              </div>
+            ) : paginatedRides && paginatedRides.length > 0 ? (
+              <>
+                <div className="space-y-4 pb-20">
+                  {paginatedRides.map((ride: FirebaseRide) => (
+                    <RideCard key={ride.id} ride={ride} />
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center py-6">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                            className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => setCurrentPage(page)}
+                              isActive={currentPage === page}
+                              className="cursor-pointer"
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        ))}
+
+                        <PaginationItem>
+                          <PaginationNext
+                            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                            className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-border px-4">
                 <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-4 text-muted-foreground">
@@ -943,6 +1099,14 @@ export default function Search() {
           </div>
         )}
       </div>
+
+      {/* Advanced Filters Panel */}
+      <SearchFiltersPanel
+        filters={advancedFilters}
+        onFiltersChange={handleFiltersChange}
+        onClose={() => setShowFilters(false)}
+        isOpen={showFilters}
+      />
     </Layout>
   );
 }

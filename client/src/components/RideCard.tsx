@@ -1,7 +1,8 @@
 import { FirebaseRide } from "@/lib/types";
 import { format } from "date-fns";
-import { MapPin, Clock, Users, ChevronRight, Calendar, CheckCircle, X } from "lucide-react";
+import { MapPin, Clock, Users, ChevronRight, Calendar, CheckCircle, X, Star, Shield, Zap, Cigarette, PawPrint, Music, Wind } from "lucide-react";
 import { Link } from "wouter";
+import { Badge } from "@/components/ui/badge";
 
 interface RideCardProps {
   ride: FirebaseRide;
@@ -32,8 +33,29 @@ export function RideCard({ ride, showStatus, userBooking, isDriverRide, onCancel
               {ride.driver?.firstName?.[0] || "D"}
             </div>
             <div>
-              <h3 className="font-semibold text-sm">{ride.driver ? `${ride.driver.firstName} ${ride.driver.lastName || ''}`.trim() || "Driver" : "Driver"}</h3>
-              <p className="text-xs text-muted-foreground">{ride.vehicle?.color} {ride.vehicle?.model}</p>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-sm">{ride.driver ? `${ride.driver.firstName} ${ride.driver.lastName || ''}`.trim() || "Driver" : "Driver"}</h3>
+                {ride.driver?.isDriverVerified && (
+                  <Shield className="w-4 h-4 text-blue-500" aria-label="Verified Driver" />
+                )}
+                {ride.instantBooking && (
+                  <Zap className="w-4 h-4 text-green-500" aria-label="Instant Booking" />
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                {ride.driverRating && (
+                  <div className="flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                    <span className="text-xs text-muted-foreground">{ride.driverRating.toFixed(1)}</span>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">{ride.vehicle?.color} {ride.vehicle?.model}</p>
+                {ride.vehicleComfort && (
+                  <Badge variant="outline" className="text-xs px-1 py-0">
+                    {ride.vehicleComfort}
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
           <div className="text-right">
@@ -85,6 +107,16 @@ export function RideCard({ ride, showStatus, userBooking, isDriverRide, onCancel
         </div>
 
         <div className="mt-4 border-t">
+          {/* Ride Preferences */}
+          {ride.preferences && (
+            <div className="flex items-center gap-2 mb-3 pt-3">
+              {ride.preferences.smoking && <Cigarette className="w-4 h-4 text-muted-foreground" aria-label="Smoking allowed" />}
+              {ride.preferences.pets && <PawPrint className="w-4 h-4 text-muted-foreground" aria-label="Pets allowed" />}
+              {ride.preferences.music && <Music className="w-4 h-4 text-muted-foreground" aria-label="Music allowed" />}
+              {ride.preferences.ac && <Wind className="w-4 h-4 text-muted-foreground" aria-label="AC available" />}
+            </div>
+          )}
+
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Calendar size={14} />

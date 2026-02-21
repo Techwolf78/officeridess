@@ -118,6 +118,95 @@ export function doesRouteOverlap(userOrigin: {lat: number, lng: number}, userDes
   return originNear && destNear && directionValid;
 }
 
+// Check if point is within flexible distance of polyline (BlaBlaCar-style: 5-10km tolerance)
+export function isPointNearPolylineFlexible(point: {lat: number, lng: number}, polyline: {lat: number, lng: number}[], thresholdKm: number = 5): boolean {
+  for (let i = 0; i < polyline.length - 1; i++) {
+    const dist = distanceToSegment(point, polyline[i], polyline[i + 1]);
+    if (dist <= thresholdKm * 1000) return true; // Convert km to meters
+  }
+  return false;
+}
+
+// Calculate route overlap score (0-1, higher is better match)
+export function calculateRouteOverlapScore(
+  userOrigin: {lat: number, lng: number},
+  userDest: {lat: number, lng: number},
+  driverPolyline: {lat: number, lng: number}[]
+): number {
+  let score = 0;
+
+  // Check if origin is near driver's route
+  const originNear = isPointNearPolylineFlexible(userOrigin, driverPolyline, 5);
+  if (originNear) score += 0.3;
+
+  // Check if destination is near driver's route
+  const destNear = isPointNearPolylineFlexible(userDest, driverPolyline, 5);
+  if (destNear) score += 0.3;
+
+  // Check direction validity
+  const directionValid = validateDirection(driverPolyline, userOrigin, userDest);
+  if (directionValid) score += 0.2;
+
+  // Calculate how much of user's route is covered by driver's route
+  const routeCoverage = calculateRouteCoverage(userOrigin, userDest, driverPolyline);
+  score += routeCoverage * 0.2;
+
+  return Math.min(score, 1.0); // Cap at 1.0
+}
+
+// Calculate what percentage of user's route is covered by driver's route
+function calculateRouteCoverage(
+  userOrigin: {lat: number, lng: number},
+  userDest: {lat: number, lng: number},
+  driverPolyline: {lat: number, lng: number}[]
+): number {
+  // Create a simplified user route (straight line)
+  const userRoute = [userOrigin, userDest];
+
+  // Count how many segments of user route are near driver route
+  let coveredSegments = 0;
+  const totalSegments = userRoute.length - 1;
+
+  for (let i = 0; i < totalSegments; i++) {
+    if (isPointNearPolylineFlexible(userRoute[i], driverPolyline, 3) ||
+        isPointNearPolylineFlexible(userRoute[i + 1], driverPolyline, 3)) {
+      coveredSegments++;
+    }
+  }
+
+  return coveredSegments / totalSegments;
+}
+
+// Enhanced route overlap check with flexible matching (BlaBlaCar-style)
+export function doesRouteOverlapFlexible(
+  userOrigin: {lat: number, lng: number},
+  userDest: {lat: number, lng: number},
+  driverPolyline: {lat: number, lng: number}[],
+  minOverlapScore: number = 0.5
+): boolean {
+  const overlapScore = calculateRouteOverlapScore(userOrigin, userDest, driverPolyline);
+  return overlapScore >= minOverlapScore;
+}
+
+// Check for intermediate stops compatibility
+export function canAccommodateStops(
+  userOrigin: {lat: number, lng: number},
+  userDest: {lat: number, lng: number},
+  driverStops: {lat: number, lng: number}[]
+): boolean {
+  // If driver has stops, check if user's origin/dest are compatible with stop sequence
+  if (driverStops.length === 0) return true;
+
+  // Simple check: user's points should be near driver's route or stops
+  const originCompatible = isPointNearPolylineFlexible(userOrigin, driverStops, 2) ||
+                          isPointNearPolylineFlexible(userOrigin, [userOrigin, ...driverStops, userDest], 5);
+
+  const destCompatible = isPointNearPolylineFlexible(userDest, driverStops, 2) ||
+                        isPointNearPolylineFlexible(userDest, [userOrigin, ...driverStops, userDest], 5);
+
+  return originCompatible && destCompatible;
+}
+
 // Fetch directions from Google API (single route)
 export async function getDirections(origin: {lat: number, lng: number}, destination: {lat: number, lng: number}, waypoints?: {lat: number, lng: number}[]): Promise<{route: {lat: number, lng: number}[], distance: number, eta: number}> {
   const options = await getRouteOptions(origin, destination);
