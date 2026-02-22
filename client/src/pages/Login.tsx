@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Car, ArrowRight, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 
 // Validate Indian mobile numbers: must start with 6, 7, 8, or 9 and be exactly 10 digits
 const isValidIndianMobileNumber = (phoneNumber: string): boolean => {
@@ -31,20 +31,6 @@ export default function Login() {
   const [showError, setShowError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [phoneValue, setPhoneValue] = useState("");
-
-  // Redirect if already logged in - check profile completion status
-  useEffect(() => {
-    if (!isLoading && user) {
-      // User is logged in, check if profile is complete
-      if (user.firstName) {
-        // Profile complete, go to home
-        setLocation("/home");
-      } else {
-        // Profile incomplete, go to register
-        setLocation("/register");
-      }
-    }
-  }, [user, isLoading, setLocation]);
 
   const phoneForm = useForm<PhoneForm>({
     resolver: zodResolver(phoneSchema),
@@ -96,16 +82,18 @@ export default function Login() {
   }
 
   return (
-    <div className="app-container flex flex-col justify-center px-8 bg-[#FAF9F4]">
-      <div className="mb-12 text-center">
-        <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6 rotate-3">
-          <Car size={40} className="text-primary" />
+    <div className="app-container flex flex-col px-8 bg-[#FAF9F4] min-h-screen">
+      {/* Centered Content */}
+      <div className="flex-1 flex flex-col justify-center">
+        <div className="mb-12 text-center">
+          <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6 rotate-3">
+            <Car size={40} className="text-primary" />
+          </div>
+          <h1 className="text-3xl font-display font-bold text-foreground mb-2">OFFICE<span className="text-primary">RIDES</span></h1>
+          <p className="text-muted-foreground">Share rides, save costs, travel better.</p>
         </div>
-        <h1 className="text-3xl font-display font-bold text-foreground mb-2">OFFICE<span className="text-primary">RIDES</span></h1>
-        <p className="text-muted-foreground">Share rides, save costs, travel better.</p>
-      </div>
 
-      <div className="bg-white p-8 rounded-3xl shadow-xl shadow-primary/5 border border-border/50">
+        <div className="bg-white p-8 rounded-3xl shadow-xl shadow-primary/5 border border-border/50">
         {showError && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex gap-3">
             <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
@@ -194,6 +182,24 @@ export default function Login() {
             )}
           </button>
         </form>
+        </div>
+      </div>
+
+      {/* Footer Links */}
+      <div className="text-center py-6 border-t border-border/50">
+        <p className="text-xs text-muted-foreground">
+          <Link href="/">
+            <span className="text-primary hover:text-primary/80 cursor-pointer transition-colors">Home</span>
+          </Link>
+          <span className="mx-2">•</span>
+          <Link href="/privacy">
+            <span className="text-primary hover:text-primary/80 cursor-pointer transition-colors">Privacy Policy</span>
+          </Link>
+          <span className="mx-2">•</span>
+          <Link href="/terms">
+            <span className="text-primary hover:text-primary/80 cursor-pointer transition-colors">Terms of Service</span>
+          </Link>
+        </p>
       </div>
     </div>
   );

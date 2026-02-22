@@ -7,9 +7,9 @@ import { RideCardSkeleton } from "@/components/RideCardSkeleton";
 import { Loader2, MapPin, Calendar as CalendarIcon, Search as SearchIcon, X, Clock, ChevronRight, ArrowRightLeft, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
-import { GoogleMap, Marker, Polyline, useJsApiLoader } from "@react-google-maps/api";
+import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
 import { haversineDistance, isPointNearPolylineFlexible, doesRouteOverlapFlexible, canAccommodateStops, calculateRouteOverlapScore, decodePolyline, reverseGeocode, getDirections } from "@/lib/utils";
-import { FirebaseRide, RouteOption } from "@/lib/types";
+import { FirebaseRide } from "@/lib/types";
 import { getRecentFromSearches, getRecentToSearches, addRecentFromSearch, addRecentToSearch, type RecentSearch } from "@/lib/recentSearches";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,6 @@ import { SearchFiltersPanel, type SearchFilters as AdvancedFilters } from "@/com
 type SearchFilters = {
   originLatLng: { lat: number; lng: number };
   destLatLng: { lat: number; lng: number };
-  route: { lat: number; lng: number }[];
   departureDate?: Date;
   departureHour?: string;
   departureMinute?: string;
@@ -62,9 +61,6 @@ export default function Search() {
   // State management
   const [originLatLng, setOriginLatLng] = useState<{lat: number, lng: number} | null>(null);
   const [destLatLng, setDestLatLng] = useState<{lat: number, lng: number} | null>(null);
-  const [route, setRoute] = useState<{lat: number, lng: number}[]>([]);
-  const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
-  const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
 
   const [originText, setOriginText] = useState('');
   const [destText, setDestText] = useState('');
@@ -107,7 +103,6 @@ export default function Search() {
     libraries: googleMapsLibraries,
   });
 
-  const directionsServiceRef = useRef<google.maps.DirectionsService | null>(null);
   const fromAutocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const toAutocompleteRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const fromPlacesRef = useRef<google.maps.places.PlacesService | null>(null);
@@ -355,128 +350,33 @@ export default function Search() {
     }
   };
 
-  const calculateRoute = async () => {
-    if (!originLatLng || !destLatLng) return;
-    
-    try {
-      if (!directionsServiceRef.current) {
-        directionsServiceRef.current = new google.maps.DirectionsService();
-      }
-
-      const request: google.maps.DirectionsRequest = {
-        origin: originLatLng,
-        destination: destLatLng,
-        travelMode: google.maps.TravelMode.DRIVING,
-        provideRouteAlternatives: true,
-      };
-
-      const results = await new Promise<google.maps.DirectionsResult>((resolve, reject) => {
-        directionsServiceRef.current!.route(request, (result, status) => {
-          if (status === google.maps.DirectionsStatus.OK && result) {
-            resolve(result);
-          } else {
-            reject(new Error(`Directions API error: ${status}`));
-          }
-        });
-      });
-
-      const options: RouteOption[] = results.routes.map((route) => {
-        const polyline = google.maps.geometry.encoding.encodePath(
-          route.overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }))
-        );
-        const distance = route.legs.reduce((acc, leg) => acc + (leg.distance?.value || 0), 0) / 1000;
-        const eta = route.legs.reduce((acc, leg) => acc + (leg.duration?.value || 0), 0) / 60;
-
-        const steps: string[] = [];
-        const roads: Set<string> = new Set();
-
-        route.legs.forEach((leg) => {
-          leg.steps.forEach((step) => {
-            const instruction = step.instructions.replace(/<[^>]*>/g, '');
-            steps.push(instruction);
-            const roadMatch = instruction.match(/(?:onto|via|along)\s+([^,]+?)(?:\s*\(|,|$)/);
-            if (roadMatch) {
-              roads.add(roadMatch[1].trim());
-            }
-          });
-        });
-
-        return {
-          polyline,
-          distance,
-          eta,
-          steps,
-          roads: Array.from(roads),
-          hasTolls: false,
-        };
-      });
-
-      setRouteOptions(options);
-      if (options.length > 0) {
-        const selected = options[0];
-        const decodedRoute = decodePolyline(selected.polyline);
-        setRoute(decodedRoute);
-        setSelectedRouteIndex(0);
-      }
-    } catch (error) {
-      console.error('Error calculating route:', error);
-      setRoute([originLatLng, destLatLng]);
-    }
-  };
-
+  // Zoom map to fit locations when both are selected
   useEffect(() => {
-    calculateRoute();
-  }, [originLatLng, destLatLng]);
-
-  // Zoom map to fit route when both locations are selected
-  useEffect(() => {
-    if (route.length > 0 && mapRef.current) {
+    if (originLatLng && destLatLng && mapRef.current) {
       const bounds = new google.maps.LatLngBounds();
       
-      // Add all route points to bounds
-      route.forEach((point) => {
-        bounds.extend({ lat: point.lat, lng: point.lng });
-      });
+      bounds.extend(originLatLng);
+      bounds.extend(destLatLng);
 
       // Fit map to bounds with padding
       mapRef.current.fitBounds(bounds, { top: 100, right: 100, bottom: 100, left: 100 });
     }
-  }, [route]);
-
-  // Scroll to results when search is completed
-  useEffect(() => {
-    if (hasSearched) {
-      setTimeout(() => {
-        document.getElementById('available-rides-section')?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start' 
-        });
-      }, 300);
-    }
-  }, [hasSearched]);
-
-  const selectRoute = (index: number) => {
-    setSelectedRouteIndex(index);
-    const selected = routeOptions[index];
-    const decodedRoute = decodePolyline(selected.polyline);
-    setRoute(decodedRoute);
-  };
+  }, [originLatLng, destLatLng]);
 
   // Filter rides based on flexible route matching (BlaBlaCar-style: 5-10km tolerance)
   const filterRidesByRoute = () => {
-    if (!filters || !filters.route || filters.route.length === 0) {
-      return rides; // Show all rides if no route selected
+    if (!filters) {
+      return rides; // Show all rides if no filters
     }
 
-    const FLEXIBLE_TOLERANCE_KM = 5; // 5km tolerance for flexible matching
-    const MIN_OVERLAP_SCORE = 0.5; // Minimum 50% route overlap score
+    const LOCATION_TOLERANCE_KM = 0.3; // 300m tolerance for location matching in urban areas
 
     return rides.filter((ride: FirebaseRide) => {
       if (!ride.originLatLng || !ride.destLatLng) {
         return false; // Exclude rides without location data
       }
 
-// ENHANCED DATE/TIME FILTERING: BlaBlaCar-style flexible time windows
+      // ENHANCED DATE/TIME FILTERING: BlaBlaCar-style flexible time windows
       if (filters.departureDate) {
         const rideDate = new Date(ride.departureTime);
         const searchDate = new Date(filters.departureDate);
@@ -490,17 +390,40 @@ export default function Search() {
         if (!timeMatches) return false;
       }
 
-      // FLEXIBLE ROUTE MATCHING: Use BlaBlaCar-style overlap detection
-      const routeOverlaps = doesRouteOverlapFlexible(
-        filters.originLatLng,
-        filters.destLatLng,
-        ride.route || [],
-        MIN_OVERLAP_SCORE
-      );
+      // Route-based location matching: search points should be within 300m of driver's route
+      const rideRoute = ride.route || [];
+      if (rideRoute.length === 0) {
+        // Fallback to simple proximity if no route data
+        const originDistance = haversineDistance(
+          filters.originLatLng.lat, filters.originLatLng.lng,
+          ride.originLatLng.lat, ride.originLatLng.lng
+        );
+        if (originDistance > LOCATION_TOLERANCE_KM) return false;
 
-      if (!routeOverlaps) return false;
+        const destDistance = haversineDistance(
+          filters.destLatLng.lat, filters.destLatLng.lng,
+          ride.destLatLng.lat, ride.destLatLng.lng
+        );
+        if (destDistance > LOCATION_TOLERANCE_KM) return false;
+      } else {
+        // Check if search origin is near any part of the driver's route
+        const originNearRoute = isPointNearPolylineFlexible(
+          filters.originLatLng,
+          rideRoute,
+          LOCATION_TOLERANCE_KM
+        );
+        if (!originNearRoute) return false;
 
-      // Check intermediate stops compatibility if ride has stops
+        // Check if search destination is near any part of the driver's route
+        const destNearRoute = isPointNearPolylineFlexible(
+          filters.destLatLng,
+          rideRoute,
+          LOCATION_TOLERANCE_KM
+        );
+        if (!destNearRoute) return false;
+      }
+
+      // For rides with stops, check if stops can accommodate the journey
       if (ride.stops && ride.stops.length > 0) {
         const stopsCompatible = canAccommodateStops(
           filters.originLatLng,
@@ -510,15 +433,7 @@ export default function Search() {
         if (!stopsCompatible) return false;
       }
 
-      // Calculate route match quality score (could be used for sorting later)
-      const matchScore = calculateRouteOverlapScore(
-        filters.originLatLng,
-        filters.destLatLng,
-        ride.route || []
-      );
-
-      // For now, just ensure minimum overlap - future enhancement could sort by score
-      return matchScore >= MIN_OVERLAP_SCORE;
+      return true;
     });
   };
 
@@ -548,13 +463,20 @@ export default function Search() {
       setFilters({
         originLatLng,
         destLatLng,
-        route,
         departureDate: finalDateTime,
         departureHour,
         departureMinute,
         departureAMPM,
       });
       setHasSearched(true);
+      
+      // Scroll to available rides section after search
+      setTimeout(() => {
+        document.getElementById('available-rides-section')?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 100);
     }
   };
 
@@ -562,7 +484,6 @@ export default function Search() {
     setFilters(undefined);
     setOriginLatLng(null);
     setDestLatLng(null);
-    setRoute([]);
     setOriginText('');
     setDestText('');
     setDepartureDate(undefined);
@@ -850,12 +771,6 @@ export default function Search() {
                           } else if (!destLatLng) {
                             setDestLatLng(latLng);
                             setDestText('Selected Destination');
-                            // Calculate route
-                            getDirections(originLatLng, latLng).then(({ route }) => {
-                              setRoute(route);
-                            }).catch(() => {
-                            setRoute([originLatLng, latLng]);
-                            });
                           }
                         }}
                         onLoad={(map) => {
@@ -865,7 +780,6 @@ export default function Search() {
                       >
                         {originLatLng && <Marker position={originLatLng} />}
                         {destLatLng && <Marker position={destLatLng} />}
-                        {route.length > 1 && <Polyline path={route} />}
                       </GoogleMap>
                     </div>
                     <p className="text-sm text-muted-foreground">Click to set origin, then destination.</p>
@@ -964,44 +878,6 @@ export default function Search() {
                   </div>
                 </form>
           </div>
-
-        {/* Route Options Section */}
-        {routeOptions.length > 0 && (
-          <div className="space-y-3 border-t pt-6">
-            <h2 className="text-lg font-bold">Choose Your Route</h2>
-            <p className="text-sm text-muted-foreground">Select the route that works best for you</p>
-
-            <div className="space-y-2">
-              {routeOptions.map((option, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => selectRoute(index)}
-                  className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
-                    selectedRouteIndex === index
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border/50 hover:border-primary/50 bg-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selectedRouteIndex === index ? 'border-primary bg-primary' : 'border-border'}`}>
-                      {selectedRouteIndex === index && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-sm text-foreground">Via {option.roads.slice(0, 2).join(', ') || 'Direct route'}</p>
-                      <div className="flex gap-3 mt-0.5 text-xs text-muted-foreground">
-                        <span>⏱ {Math.round(option.eta)} min</span>
-                        <span>📍 {option.distance.toFixed(1)} km</span>
-                        {option.hasTolls && <span>🛣️ Tolls may apply</span>}
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Results */}
         {hasSearched && (

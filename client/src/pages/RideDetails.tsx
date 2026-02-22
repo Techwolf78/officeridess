@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCreateBooking, useBookings } from "@/hooks/use-bookings";
 import { useChat } from "@/hooks/use-chat";
 import { Layout } from "@/components/ui/Layout";
+import { DriverBadge } from "@/components/DriverBadge";
 import { Loader2, ArrowLeft, Calendar, Clock, MapPin, Users, Shield, User as UserIcon, CheckCircle, X, MessageCircle, Phone } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -214,10 +215,11 @@ export default function RideDetails() {
             </div>
             <div className="flex-1">
               <h4 className="font-semibold text-foreground">{ride.driver ? `${ride.driver.firstName} ${ride.driver.lastName || ''}`.trim() || "Driver" : "Driver"}</h4>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                <Shield size={12} className="text-primary" />
-                <span>Verified Driver</span>
-              </div>
+              {ride.driver?.verificationStatus && (
+                <div className="mt-1">
+                  <DriverBadge verificationStatus={ride.driver.verificationStatus} size="sm" />
+                </div>
+              )}
             </div>
             <div className="text-right">
               <p className="text-sm font-medium">{ride.vehicle?.model}</p>

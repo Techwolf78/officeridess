@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Car, Users, Heart, Shield, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 

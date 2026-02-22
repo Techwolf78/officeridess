@@ -6,14 +6,23 @@ export interface FirebaseUser {
   phoneNumber: string;
   firstName?: string;
   lastName?: string;
+  displayName?: string;
   email?: string;
   gender?: "male" | "female" | "other";
   role: "passenger" | "driver";
   isDriverVerified: boolean;
+  // Driver verification status: basic (unverified), pending (awaiting approval), verified (approved)
+  verificationStatus?: "basic" | "pending" | "verified";
+  // Timestamp when driver requested verification
+  verificationRequestedAt?: Date;
   homeAddress?: string;
   officeAddress?: string;
   profileImage?: string;
+  profilePicture?: string;
   createdAt: Date;
+  rating?: number;
+  totalRides?: number;
+  verified?: boolean;
   // New aggregated rating fields for search
   averageRating?: number;
   totalRatings?: number;
@@ -154,6 +163,8 @@ export const firebaseUserSchema = z.object({
   gender: z.enum(["male", "female", "other"]).optional(),
   role: z.enum(["passenger", "driver"]),
   isDriverVerified: z.boolean(),
+  verificationStatus: z.enum(["basic", "pending", "verified"]).optional(),
+  verificationRequestedAt: z.date().optional(),
   homeAddress: z.string().optional(),
   officeAddress: z.string().optional(),
   profileImage: z.string().optional(),

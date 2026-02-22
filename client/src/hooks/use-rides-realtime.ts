@@ -126,7 +126,7 @@ export function useRidesRealtime(filters?: {
 
           // Advanced filters
           if (filters?.verifiedDriversOnly) {
-            ridesData = ridesData.filter(ride => ride.driver?.isDriverVerified === true);
+            ridesData = ridesData.filter(ride => ride.driver?.verificationStatus === 'verified');
           }
           if (filters?.vehicleComfort) {
             ridesData = ridesData.filter(ride => ride.vehicleComfort === filters.vehicleComfort);

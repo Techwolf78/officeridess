@@ -6,10 +6,10 @@ export default function PrivacyPolicy() {
   return (
     <Layout headerTitle="Privacy Policy" showNav={true}>
       <div className="px-4 py-6 pb-24 max-w-2xl mx-auto font-sans">
-        <Link href="/settings">
+        <Link href="/">
           <button className="flex items-center gap-2 text-primary hover:text-primary/80 mb-6 cursor-pointer transition-colors">
             <ArrowLeft size={20} />
-            <span className="text-sm font-medium">Back to Settings</span>
+            <span className="text-sm font-medium">Back</span>
           </button>
         </Link>
 

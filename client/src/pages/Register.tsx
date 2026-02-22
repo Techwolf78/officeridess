@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Layout } from "@/components/ui/Layout";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Loader2, Car, ArrowRight, User, MapPin, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
@@ -275,6 +275,23 @@ export default function Register() {
             </div>
           </form>
         )}
+
+        {/* Footer Links */}
+        <div className="text-center py-6 border-t border-border/50 mt-8">
+          <p className="text-xs text-muted-foreground">
+            <Link href="/">
+              <span className="text-primary hover:text-primary/80 cursor-pointer transition-colors">Home</span>
+            </Link>
+            <span className="mx-2">•</span>
+            <Link href="/privacy">
+              <span className="text-primary hover:text-primary/80 cursor-pointer transition-colors">Privacy Policy</span>
+            </Link>
+            <span className="mx-2">•</span>
+            <Link href="/terms">
+              <span className="text-primary hover:text-primary/80 cursor-pointer transition-colors">Terms of Service</span>
+            </Link>
+          </p>
+        </div>
       </div>
     </Layout>
   );

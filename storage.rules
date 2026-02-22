@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Default deny all
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Driver verification images
+    // Users can upload, read, and download their own verification images
+    match /verifications/{userId}/{filename} {
+      // Allow authenticated users to read/write/delete their own verification files
+      allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+      
+      // File size limit: 10MB (for write operations)
+      allow write: if request.resource.size <= 10 * 1024 * 1024;
+      
+      // Only allow image files for write operations
+      allow write: if request.resource.contentType.matches('image/.*');
+    }
+
+    // Allow admins to read all verification images
+    match /verifications/{userId}/{filename} {
+      allow read: if request.auth.token.admin == true;
+    }
+  }
+}
+

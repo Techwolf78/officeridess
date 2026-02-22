@@ -136,11 +136,11 @@ export function calculateRouteOverlapScore(
   let score = 0;
 
   // Check if origin is near driver's route
-  const originNear = isPointNearPolylineFlexible(userOrigin, driverPolyline, 5);
+  const originNear = isPointNearPolylineFlexible(userOrigin, driverPolyline, 0.3);
   if (originNear) score += 0.3;
 
   // Check if destination is near driver's route
-  const destNear = isPointNearPolylineFlexible(userDest, driverPolyline, 5);
+  const destNear = isPointNearPolylineFlexible(userDest, driverPolyline, 0.3);
   if (destNear) score += 0.3;
 
   // Check direction validity
@@ -168,8 +168,8 @@ function calculateRouteCoverage(
   const totalSegments = userRoute.length - 1;
 
   for (let i = 0; i < totalSegments; i++) {
-    if (isPointNearPolylineFlexible(userRoute[i], driverPolyline, 3) ||
-        isPointNearPolylineFlexible(userRoute[i + 1], driverPolyline, 3)) {
+    if (isPointNearPolylineFlexible(userRoute[i], driverPolyline, 0.3) ||
+        isPointNearPolylineFlexible(userRoute[i + 1], driverPolyline, 0.3)) {
       coveredSegments++;
     }
   }
@@ -198,11 +198,11 @@ export function canAccommodateStops(
   if (driverStops.length === 0) return true;
 
   // Simple check: user's points should be near driver's route or stops
-  const originCompatible = isPointNearPolylineFlexible(userOrigin, driverStops, 2) ||
-                          isPointNearPolylineFlexible(userOrigin, [userOrigin, ...driverStops, userDest], 5);
+  const originCompatible = isPointNearPolylineFlexible(userOrigin, driverStops, 0.3) ||
+                          isPointNearPolylineFlexible(userOrigin, [userOrigin, ...driverStops, userDest], 0.3);
 
-  const destCompatible = isPointNearPolylineFlexible(userDest, driverStops, 2) ||
-                        isPointNearPolylineFlexible(userDest, [userOrigin, ...driverStops, userDest], 5);
+  const destCompatible = isPointNearPolylineFlexible(userDest, driverStops, 0.3) ||
+                        isPointNearPolylineFlexible(userDest, [userOrigin, ...driverStops, userDest], 0.3);
 
   return originCompatible && destCompatible;
 }

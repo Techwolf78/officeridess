@@ -36,6 +36,7 @@ export function LocationInput({ value, onChange, placeholder, label }: LocationI
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const inputRef = useRef<HTMLDivElement | null>(null);
+  const dummyDivRef = useRef<HTMLDivElement | null>(null);
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
@@ -44,21 +45,31 @@ export function LocationInput({ value, onChange, placeholder, label }: LocationI
 
   // Sync searchInput with value prop
   useEffect(() => {
-    setSearchInput(value);
+    if (value !== undefined) {
+      setSearchInput(value);
+    }
   }, [value]);
 
   // Initialize Places Services
   useEffect(() => {
     if (isLoaded && window.google) {
-      autocompleteService.current = new google.maps.places.AutocompleteService();
+      if (!autocompleteService.current) {
+        autocompleteService.current = new google.maps.places.AutocompleteService();
+      }
+      if (!placesService.current) {
+        // Use a dummy div if the map isn't available yet
+        const element = dummyDivRef.current || document.createElement('div');
+        placesService.current = new google.maps.places.PlacesService(element);
+      }
     }
   }, [isLoaded]);
 
+  // Update places service if map becomes available
   useEffect(() => {
-    if (mapRef.current && window.google && !placesService.current) {
+    if (mapRef.current && window.google) {
       placesService.current = new google.maps.places.PlacesService(mapRef.current);
     }
-  }, [isLoaded]);
+  }, [mapRef.current]);
 
   // Handle autocomplete search
   const handleSearchChange = async (input: string) => {
@@ -80,12 +91,16 @@ export function LocationInput({ value, onChange, placeholder, label }: LocationI
     }
 
     try {
-      const predictions = await autocompleteService.current.getPlacePredictions({
+      autocompleteService.current.getPlacePredictions({
         input,
-        componentRestrictions: { country: ["in"] },
+        componentRestrictions: { country: ["in"] }, // Restrict to India
+      }, (predictions, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+          setSuggestions(predictions);
+        } else {
+          setSuggestions([]);
+        }
       });
-
-      setSuggestions(predictions.predictions || []);
     } catch (error) {
       console.error("Autocomplete error:", error);
       setSuggestions([]);
@@ -94,30 +109,29 @@ export function LocationInput({ value, onChange, placeholder, label }: LocationI
 
   // Handle suggestion selection
   const handleSelectSuggestion = (placeId: string, description: string, mainText: string) => {
-    if (!placesService.current) return;
+    if (!placesService.current) {
+      console.warn("Places service not ready");
+      return;
+    }
 
     setSearchInput(description);
     setSuggestions([]);
     setShowSuggestions(false);
 
     placesService.current.getDetails(
-      { placeId, fields: ["geometry"] },
+      { placeId, fields: ["geometry", "formatted_address", "name"] },
       (result, status) => {
-        if (status === "OK" && result?.geometry?.location) {
+        if (status === google.maps.places.PlacesServiceStatus.OK && result?.geometry?.location) {
           const lat = result.geometry.location.lat();
           const lng = result.geometry.location.lng();
+          const address = result.formatted_address || description;
+          
           setMarkerPosition({ lat, lng });
-          onChange(description, lat, lng);
+          onChange(address, lat, lng);
           
           // Save to recent locations
           addRecentFromSearch({ name: mainText, lat, lng });
           setRecentLocations(getRecentFromSearches());
-          
-          // Pan map to new location
-          if (mapRef.current) {
-            mapRef.current.panTo({ lat, lng });
-            mapRef.current.setZoom(15);
-          }
         }
       }
     );
@@ -196,12 +210,18 @@ export function LocationInput({ value, onChange, placeholder, label }: LocationI
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  handleSelectSuggestion(suggestion.place_id, suggestion.description, suggestion.main_text || suggestion.description);
+                  handleSelectSuggestion(
+                    suggestion.place_id, 
+                    suggestion.description, 
+                    suggestion.structured_formatting?.main_text || suggestion.description
+                  );
                 }}
                 className="w-full text-left px-4 py-3 hover:bg-secondary border-b border-border/30 last:border-0 transition-colors flex items-center gap-2"
               >
                 <MapPin size={16} className="text-muted-foreground flex-shrink-0" />
-                <span className="text-sm text-foreground">{suggestion.main_text || suggestion.description}</span>
+                <span className="text-sm text-foreground">
+                  {suggestion.structured_formatting?.main_text || suggestion.description}
+                </span>
               </button>
             ))}
           </div>
@@ -243,7 +263,7 @@ export function LocationInput({ value, onChange, placeholder, label }: LocationI
       )}
 
       {/* Map - Hidden */}
-      <div className="hidden bg-white border border-border/50 rounded-lg p-2 space-y-2">
+      <div className="hidden" ref={dummyDivRef}>
         <GoogleMap
           mapContainerStyle={mapContainerStyle}
           center={markerPosition}
@@ -254,9 +274,6 @@ export function LocationInput({ value, onChange, placeholder, label }: LocationI
         >
           <Marker position={markerPosition} />
         </GoogleMap>
-        <p className="text-xs text-muted-foreground text-center">
-          Search to select location
-        </p>
       </div>
     </div>
   );

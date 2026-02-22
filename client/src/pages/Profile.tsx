@@ -2,10 +2,11 @@ import { Layout } from "@/components/ui/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useVehiclesRealtime } from "@/hooks/use-vehicles-realtime";
 import { useCreateVehicle } from "@/hooks/use-vehicles";
-import { Loader2, LogOut, Settings, Shield, Car, Plus, Bike } from "lucide-react";
+import { Loader2, LogOut, Settings, Shield, Car, Plus, Bike, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation, Link } from "wouter";
 import React, { useState } from "react";
+import { DriverBadge } from "@/components/DriverBadge";
 import {
   Dialog,
   DialogContent,
@@ -102,7 +103,7 @@ export default function Profile() {
     <Layout headerTitle="Profile" showNav={true}>
       <div className="px-4 py-2 pb-24">
         {/* Profile Header */}
-        <div className="flex flex-col items-center mb-4">
+        <div className="flex flex-col items-center mb-6">
           <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center text-2xl font-bold text-muted-foreground mb-2 border-2 border-white shadow-md">
              {user.profileImage ? (
                <img src={user.profileImage} alt="Profile" className="w-full h-full rounded-full object-cover" />
@@ -112,10 +113,41 @@ export default function Profile() {
           </div>
           <h2 className="text-lg font-bold">{user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : "User"}</h2>
           <p className="text-muted-foreground text-xs">{user.phoneNumber}</p>
-          <span className="mt-1 text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full capitalize">
-            {user.role}
-          </span>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full capitalize">
+              {user.role}
+            </span>
+            {user.role === 'driver' && user.verificationStatus && (
+              <DriverBadge verificationStatus={user.verificationStatus} size="sm" />
+            )}
+          </div>
         </div>
+
+        {/* Driver Verification Section */}
+        {user.role === 'driver' && user.verificationStatus !== 'verified' && (
+          <Link href="/verification-required">
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100/50 border border-blue-200 rounded-2xl p-4 mb-4 cursor-pointer hover:border-blue-300 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-blue-900">Get Verified</p>
+                  <p className="text-xs text-blue-700 mt-0.5">
+                    {user.verificationStatus === 'pending'
+                      ? 'Your verification is in progress...'
+                      : 'Unlock verified badge and get more ride requests'}
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </Link>
+        )}
 
         {/* Menu Items */}
         <div className="space-y-4 ">

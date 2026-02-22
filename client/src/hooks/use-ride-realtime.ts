@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import {
   doc,
   onSnapshot,
-  Timestamp
+  Timestamp,
+  getDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { FirebaseRide } from "@/lib/types";
+import { FirebaseRide, FirebaseUser, FirebaseVehicle } from "@/lib/types";
 
 export function useRideRealtime(rideId: string) {
   const [ride, setRide] = useState<FirebaseRide | null>(null);
@@ -28,7 +29,7 @@ export function useRideRealtime(rideId: string) {
       // Set up real-time listener
       const unsubscribe = onSnapshot(
         rideRef,
-        (docSnap) => {
+        async (docSnap) => {
           if (!docSnap.exists()) {
             setRide(null);
             setError("Ride not found");
@@ -37,6 +38,62 @@ export function useRideRealtime(rideId: string) {
           }
 
           const data = docSnap.data();
+          
+          // Fetch driver data
+          let driverData: FirebaseUser | undefined;
+          if (data.driverId) {
+            try {
+              const driverDoc = await getDoc(doc(db, "users", data.driverId));
+              if (driverDoc.exists()) {
+                const driver = driverDoc.data();
+                // Split displayName into firstName and lastName if available
+                const nameParts = driver.displayName ? driver.displayName.split(' ') : [];
+                const firstName = nameParts[0] || '';
+                const lastName = nameParts.slice(1).join(' ') || '';
+                
+                driverData = {
+                  uid: driverDoc.id,
+                  phoneNumber: driver.phoneNumber,
+                  firstName: driver.firstName || firstName,
+                  lastName: driver.lastName || lastName,
+                  displayName: driver.displayName,
+                  email: driver.email,
+                  homeAddress: driver.homeAddress,
+                  officeAddress: driver.officeAddress,
+                  profilePicture: driver.profilePicture,
+                  createdAt: driver.createdAt instanceof Timestamp ? driver.createdAt.toDate() : new Date(driver.createdAt),
+                  rating: driver.rating,
+                  totalRides: driver.totalRides,
+                  verified: driver.verified,
+                };
+              }
+            } catch (err) {
+              console.error("Error fetching driver data:", err);
+            }
+          }
+
+          // Fetch vehicle data
+          let vehicleData: FirebaseVehicle | undefined;
+          if (data.vehicleId) {
+            try {
+              const vehicleDoc = await getDoc(doc(db, "vehicles", data.vehicleId));
+              if (vehicleDoc.exists()) {
+                const vehicle = vehicleDoc.data();
+                vehicleData = {
+                  id: vehicleDoc.id,
+                  userId: vehicle.userId,
+                  model: vehicle.model,
+                  plateNumber: vehicle.plateNumber,
+                  color: vehicle.color,
+                  capacity: vehicle.capacity,
+                  type: vehicle.type,
+                };
+              }
+            } catch (err) {
+              console.error("Error fetching vehicle data:", err);
+            }
+          }
+
           const rideData: FirebaseRide = {
             id: docSnap.id,
             driverId: data.driverId,
@@ -62,8 +119,8 @@ export function useRideRealtime(rideId: string) {
             originDisplayName: data.originDisplayName,
             destDisplayName: data.destDisplayName,
             // Populated fields
-            driver: data.driver,
-            vehicle: data.vehicle,
+            driver: driverData,
+            vehicle: vehicleData,
           };
 
           setRide(rideData);
