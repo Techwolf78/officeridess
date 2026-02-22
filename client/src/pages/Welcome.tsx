@@ -204,8 +204,8 @@ export default function Welcome() {
       {/* Footer Links */}
       <div className="text-center py-6 border-t border-border/50 z-10 bg-white/50">
         <p className="text-xs text-muted-foreground">
-          <Link href="/">
-            <span className="text-primary hover:text-primary/80 cursor-pointer transition-colors">Home</span>
+          <Link href="/login">
+            <span className="text-primary hover:text-primary/80 cursor-pointer transition-colors">Login</span>
           </Link>
           <span className="mx-2">•</span>
           <Link href="/privacy">
