@@ -200,6 +200,23 @@ export default function Welcome() {
           </button>
         </div>
       </div>
+
+      {/* Footer Links */}
+      <div className="text-center py-6 border-t border-border/50 z-10 bg-white/50">
+        <p className="text-xs text-muted-foreground">
+          <Link href="/">
+            <span className="text-primary hover:text-primary/80 cursor-pointer transition-colors">Home</span>
+          </Link>
+          <span className="mx-2">•</span>
+          <Link href="/privacy">
+            <span className="text-primary hover:text-primary/80 cursor-pointer transition-colors">Privacy Policy</span>
+          </Link>
+          <span className="mx-2">•</span>
+          <Link href="/terms">
+            <span className="text-primary hover:text-primary/80 cursor-pointer transition-colors">Terms of Service</span>
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
