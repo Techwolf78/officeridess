@@ -127,6 +127,48 @@ export function isPointNearPolylineFlexible(point: {lat: number, lng: number}, p
   return false;
 }
 
+// Get minimum distance from point to polyline in meters
+export function minDistanceToPolyline(point: {lat: number, lng: number}, polyline: {lat: number, lng: number}[]): number {
+  if (polyline.length < 2) return Infinity;
+  let minDist = Infinity;
+  for (let i = 0; i < polyline.length - 1; i++) {
+    const dist = distanceToSegment(point, polyline[i], polyline[i + 1]);
+    if (dist < minDist) minDist = dist;
+  }
+  return minDist;
+}
+
+// Get distance along polyline to the point closest to target point (in km)
+export function getDistanceAlongPolyline(point: {lat: number, lng: number}, polyline: {lat: number, lng: number}[]): number {
+  if (polyline.length < 2) return 0;
+  let minDist = Infinity;
+  let distAlong = 0;
+  let bestDistAlong = 0;
+  
+  for (let i = 0; i < polyline.length - 1; i++) {
+    const v = polyline[i];
+    const w = polyline[i+1];
+    const segmentLen = haversineDistance(v.lat, v.lng, w.lat, w.lng);
+    
+    // Projection factor t
+    const dx = w.lat - v.lat;
+    const dy = w.lng - v.lng;
+    const mag2 = dx * dx + dy * dy;
+    let t = mag2 === 0 ? 0 : ((point.lat - v.lat) * dx + (point.lng - v.lng) * dy) / mag2;
+    t = Math.max(0, Math.min(1, t));
+    
+    const proj = {lat: v.lat + t * dx, lng: v.lng + t * dy};
+    const d = haversineDistance(point.lat, point.lng, proj.lat, proj.lng);
+    
+    if (d < minDist) {
+      minDist = d;
+      bestDistAlong = distAlong + (t * segmentLen);
+    }
+    distAlong += segmentLen;
+  }
+  return bestDistAlong;
+}
+
 // Calculate route overlap score (0-1, higher is better match)
 export function calculateRouteOverlapScore(
   userOrigin: {lat: number, lng: number},

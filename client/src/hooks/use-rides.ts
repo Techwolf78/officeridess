@@ -104,7 +104,7 @@ export function useRides(filters?: { origin?: string; destination?: string; date
             if (!ride.routePolyline) return false;
             // Decode polyline
             const polyline = decodePolyline(ride.routePolyline);
-            return doesRouteOverlap(filters.originLatLng!, filters.destLatLng!, polyline, 300);
+            return doesRouteOverlap(filters.originLatLng!, filters.destLatLng!, polyline, 3000);
           });
         }
 

@@ -369,7 +369,7 @@ export default function Search() {
       return rides; // Show all rides if no filters
     }
 
-    const LOCATION_TOLERANCE_KM = 0.3; // 300m tolerance for location matching in urban areas
+    const LOCATION_TOLERANCE_KM = 3.0; // 3km tolerance for location matching in urban areas
 
     return rides.filter((ride: FirebaseRide) => {
       if (!ride.originLatLng || !ride.destLatLng) {
@@ -924,7 +924,7 @@ export default function Search() {
               <>
                 <div className="space-y-4 pb-20">
                   {paginatedRides.map((ride: FirebaseRide) => (
-                    <RideCard key={ride.id} ride={ride} />
+                    <RideCard key={ride.id} ride={ride} passengerOrigin={filters?.originLatLng} passengerDest={filters?.destLatLng} />
                   ))}
                 </div>
 

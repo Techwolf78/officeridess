@@ -1,9 +1,10 @@
 import { FirebaseRide } from "@/lib/types";
-import { format } from "date-fns";
-import { MapPin, Clock, Users, ChevronRight, Calendar, CheckCircle, X, Star, Shield, Zap, Cigarette, PawPrint, Music, Wind } from "lucide-react";
+import { format, addMinutes } from "date-fns";
+import { MapPin, Clock, Users, ChevronRight, Calendar, CheckCircle, X, Star, Shield, Zap, Cigarette, PawPrint, Music, Wind, Route, Flag } from "lucide-react";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { DriverBadge } from "@/components/DriverBadge";
+import { minDistanceToPolyline, decodePolyline, getDistanceAlongPolyline } from "@/lib/utils";
 
 interface RideCardProps {
   ride: FirebaseRide;
@@ -11,10 +12,42 @@ interface RideCardProps {
   userBooking?: boolean; // Whether current user has booked this ride
   isDriverRide?: boolean; // Whether current user is the driver of this ride
   onCancelRide?: (rideId: string) => void; // Callback for cancelling ride
+  passengerOrigin?: { lat: number; lng: number }; // Passenger's search origin
+  passengerDest?: { lat: number; lng: number }; // Passenger's search destination
 }
 
-export function RideCard({ ride, showStatus, userBooking, isDriverRide, onCancelRide }: RideCardProps) {
+export function RideCard({ ride, showStatus, userBooking, isDriverRide, onCancelRide, passengerOrigin, passengerDest }: RideCardProps) {
   const isFull = ride.availableSeats === 0;
+
+  // Get the route polyline
+  const routePolyline = ride.route && ride.route.length > 0 ? ride.route : (ride.routePolyline ? decodePolyline(ride.routePolyline) : []);
+
+  // Calculate distances if passenger points provided
+  let originDistance: number | null = null;
+  let destDistance: number | null = null;
+  if (passengerOrigin && routePolyline.length > 0) {
+    originDistance = minDistanceToPolyline(passengerOrigin, routePolyline);
+  }
+  if (passengerDest && routePolyline.length > 0) {
+    destDistance = minDistanceToPolyline(passengerDest, routePolyline);
+  }
+
+  // Calculate pickup time if passenger origin provided
+  let pickupTime: Date | null = null;
+  if (passengerOrigin && routePolyline.length > 0 && ride.distance > 0 && ride.eta) {
+    const distToPickup = getDistanceAlongPolyline(passengerOrigin, routePolyline);
+    const timeOffsetMinutes = (distToPickup / ride.distance) * ride.eta;
+    pickupTime = addMinutes(new Date(ride.departureTime), Math.round(timeOffsetMinutes));
+  }
+
+  // Format distance for display
+  const formatDistance = (dist: number): string => {
+    if (dist < 1000) {
+      return `${Math.round(dist)}m`;
+    } else {
+      return `${(dist / 1000).toFixed(1)} km`;
+    }
+  };
 
   const handleCancelClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -153,7 +186,7 @@ export function RideCard({ ride, showStatus, userBooking, isDriverRide, onCancel
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock size={14} />
-              <span>{ride.eta ? `${Math.round(ride.eta)} min` : "ETA unknown"}</span>
+              <span>{ride.eta ? `approx. ${Math.round(ride.eta)} min` : "ETA unknown"}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <MapPin size={14} />
@@ -161,6 +194,34 @@ export function RideCard({ ride, showStatus, userBooking, isDriverRide, onCancel
             </div>
           </div>
         </div>
+
+        {/* Passenger distance info */}
+        {(originDistance !== null || destDistance !== null) && (
+          <div className="border-t border-border/50 mt-2 pt-2">
+            <div className="flex justify-between items-center text-xs text-muted-foreground px-0">
+              <div className="flex items-center gap-0.5" title="Distance from your pickup to the ride route">
+                <span className="text-[10px] font-medium">Pickup</span>
+                <MapPin size={10} />
+                <span className="flex items-center gap-1 text-[10px]">
+                  {originDistance !== null ? formatDistance(originDistance) : "—"}
+                  {pickupTime && (
+                    <span className="text-primary font-bold">(approx. {format(pickupTime, "h:mm a")})</span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-0.5" title="Total ride distance">
+                <span className="text-[10px] font-medium">Ride</span>
+                <Route size={10} />
+                <span className="text-[10px]">{ride.distance ? `${ride.distance.toFixed(1)} km` : "—"}</span>
+              </div>
+              <div className="flex items-center gap-0.5" title="Distance from your destination to the ride route">
+                <span className="text-[10px] font-medium">Drop</span>
+                <Flag size={10} />
+                <span className="text-[10px]">{destDistance !== null ? formatDistance(destDistance) : "—"}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Link>
     </div>
