@@ -113,16 +113,18 @@ export default function Home() {
   }
 
   return (
-    <Layout headerTitle="OFFICERIDES">
-      <div className="px-4 py-6 space-y-8">
-        {/* Welcome Section */}
-        <div>
+    <Layout
+      headerTitle="OFFICERIDES"
+      headerExtra={
+        <>
           <h2 className="text-2xl font-display font-bold text-foreground">
             Hello, {user?.firstName || "Traveler"} 👋
           </h2>
           <p className="text-muted-foreground mt-1">Where do you want to go today?</p>
-        </div>
-
+        </>
+      }
+    >
+      <div className="px-4 py-6 space-y-8">
         {/* Quick Search Widget */}
         {!isDriver && (
           <div className="bg-primary rounded-3xl p-6 shadow-xl shadow-primary/20 text-white relative overflow-hidden">
