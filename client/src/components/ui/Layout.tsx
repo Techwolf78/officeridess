@@ -54,7 +54,7 @@ export function Layout({ children, showNav = true, headerTitle, className, heade
         >
           <h1 className="font-display text-xl font-bold text-primary">{headerTitle}</h1>
           {(headerExtra || isHome) && (
-            <div className="mt-4 w-full">
+            <div className="w-full">
               {headerExtra}
             </div>
           )}

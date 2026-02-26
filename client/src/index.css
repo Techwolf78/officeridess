@@ -77,6 +77,6 @@
 
 /* traditional CSS rule for the special home header rounding */
 .home-header {
-  border-bottom-left-radius: 2.5rem; /* updated to 4rem */
-  border-bottom-right-radius: 2.5rem;
+  border-bottom-left-radius: 2rem; /* reduced from 2.5rem */
+  border-bottom-right-radius: 2rem;
 }

@@ -6,7 +6,7 @@ import { useBookings } from "@/hooks/use-bookings";
 import { useBookingsRealtime } from "@/hooks/use-bookings-realtime";
 import { RideCard } from "@/components/RideCard";
 import { RideCardSkeleton } from "@/components/RideCardSkeleton";
-import { Loader2, MapPin, Calendar, Search, Star } from "lucide-react";
+import { Loader2, MapPin, Calendar, Search, Star, TrendingUp, CheckCircle2, Zap, Wallet, BarChart3 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -112,19 +112,51 @@ export default function Home() {
     });
   }
 
+  const stats = isDriver ? [
+    { label: "Offered", value: user?.totalRides || 0, icon: MapPin, color: "text-blue-500", bg: "bg-blue-50" },
+    { label: "Rating", value: user?.averageRating?.toFixed(1) || "5.0", icon: Star, color: "text-amber-500", bg: "bg-amber-50" },
+    { label: "Level", value: user?.verificationStatus === 'verified' ? "Pro" : "Basic", icon: Zap, color: "text-emerald-500", bg: "bg-emerald-50" },
+  ] : [
+    { label: "Rides", value: user?.totalRides || 0, icon: MapPin, color: "text-primary", bg: "bg-green-50" },
+    { label: "Rating", value: user?.averageRating?.toFixed(1) || "5.0", icon: Star, color: "text-amber-500", bg: "bg-amber-50" },
+    { label: "CO2 Saved", value: `${((user?.totalRides || 0) * 2.4).toFixed(1)}kg`, icon: Zap, color: "text-emerald-500", bg: "bg-emerald-50" },
+  ];
+
   return (
     <Layout
       headerTitle="OFFICERIDES"
       headerExtra={
-        <>
-          <h2 className="text-2xl font-display font-bold text-foreground">
-            Hello, {user?.firstName || "Traveler"} 👋
-          </h2>
-          <p className="text-muted-foreground mt-1">Where do you want to go today?</p>
-        </>
+        <div className="relative pb-12 pt-2">
+          <div className="mb-2">
+            <h2 className="text-2xl font-display font-bold text-foreground leading-tight">
+              Hello, {user?.firstName || "Traveler"} 👋
+            </h2>
+            <p className="text-slate-500 font-medium text-sm mt-1">Ready for your daily commute?</p>
+          </div>
+          
+          {/* Stat Cards - Floating 3D style straddling the header edge */}
+          <div className="absolute -bottom-16 left-0 right-0 grid grid-cols-3 gap-3 z-10">
+            {stats.map((stat, idx) => (
+              <div 
+                key={idx} 
+                className="bg-white p-3.5 rounded-[1.25rem] shadow-[0_12px_30px_-5px_rgba(0,0,0,0.08),0_1px_4px_rgba(0,0,0,0.01)] border border-slate-100 flex flex-col items-center justify-center text-center transition-all hover:-translate-y-1 active:scale-95 group"
+              >
+                 <div className={`${stat.bg} w-10 h-10 rounded-2xl flex items-center justify-center mb-1.5 shadow-sm group-hover:rotate-12 transition-transform`}>
+                   <stat.icon className={stat.color} size={18} strokeWidth={2.5} />
+                 </div>
+                 <span className="text-[15px] font-black text-slate-800 tracking-tight leading-none">
+                   {stat.value}
+                 </span>
+                 <span className="text-[9px] text-slate-400 uppercase font-black tracking-widest mt-1.5 opacity-80">
+                   {stat.label}
+                 </span>
+              </div>
+            ))}
+          </div>
+        </div>
       }
     >
-      <div className="px-4 py-6 space-y-8">
+      <div className="px-4 pt-16 pb-8 space-y-8 relative">
         {/* Quick Search Widget */}
         {!isDriver && (
           <div className="bg-primary rounded-3xl p-6 shadow-xl shadow-primary/20 text-white relative overflow-hidden">

@@ -7,7 +7,7 @@ import { useVehicles } from "@/hooks/use-vehicles";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation, Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, MapPin, Car, Check, ChevronRight, Clock, Calendar as CalendarIcon } from "lucide-react";
+import { Loader2, MapPin, Car, Check, ChevronRight, Clock, Calendar as CalendarIcon, ShieldCheck, Zap } from "lucide-react";
 import { CreateRideRequest, RouteOption } from "@/lib/types";
 import { GoogleMap, Marker, Polyline, Autocomplete } from "@react-google-maps/api";
 import { useState, useEffect, useRef } from "react";
@@ -36,6 +36,8 @@ const createRideFormSchema = z.object({
   departureTime: z.string().optional(),
   totalSeats: z.coerce.number().min(1, "At least 1 seat required"),
   pricePerSeat: z.coerce.number().min(0, "Price must be positive"),
+  vehicleComfort: z.enum(['basic', 'comfort', 'premium']),
+  instantBooking: z.boolean().default(false),
 });
 
 type CreateRideForm = z.infer<typeof createRideFormSchema>;
@@ -211,6 +213,8 @@ export default function CreateRide() {
       stops: [],
       distance: 0,
       eta: 0,
+      vehicleComfort: 'comfort',
+      instantBooking: true,
     }
   });
 
@@ -310,6 +314,8 @@ export default function CreateRide() {
       departureTime: finalDateTime,
       totalSeats: data.totalSeats,
       pricePerSeat: data.pricePerSeat,
+      vehicleComfort: data.vehicleComfort,
+      instantBooking: data.instantBooking,
       status: "scheduled",
     };
 
@@ -707,6 +713,41 @@ export default function CreateRide() {
                   className="w-full bg-secondary rounded-lg px-4 py-3 outline-none text-sm border border-border/50 focus:border-primary transition-colors"
                 />
               </div>
+
+              {/* Preferences - Two columns */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                {/* Vehicle Comfort */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <ShieldCheck size={16} className="text-primary" />
+                    Comfort Level
+                  </label>
+                  <select
+                    {...form.register("vehicleComfort")}
+                    className="w-full bg-secondary rounded-lg px-4 py-3 outline-none text-sm border border-border/50 focus:border-primary transition-colors"
+                  >
+                    <option value="basic">Basic (Entry level)</option>
+                    <option value="comfort" selected>Comfort (Standard)</option>
+                    <option value="premium">Premium (Luxury)</option>
+                  </select>
+                </div>
+
+                {/* Instant Booking */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Zap size={16} className="text-amber-500 fill-amber-500" />
+                    Booking Type
+                  </label>
+                  <select
+                    onChange={(e) => form.setValue('instantBooking', e.target.value === 'true')}
+                    defaultValue="true"
+                    className="w-full bg-secondary rounded-lg px-4 py-3 outline-none text-sm border border-border/50 focus:border-primary transition-colors"
+                  >
+                    <option value="true">Instant (Auto-confirm)</option>
+                    <option value="false">Manual (I approve)</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -736,6 +777,15 @@ export default function CreateRide() {
                   <span className="font-medium">
                     {departureDate ? `${format(departureDate, "MMM dd, yyyy")} at ${departureHour}:${departureMinute} ${departureAMPM}` : "Not set"}
                   </span>
+                </div>
+                {/* Additional Preferences in summary */}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Comfort</span>
+                  <span className="font-medium capitalize">{form.watch('vehicleComfort')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Booking</span>
+                  <span className="font-medium">{form.watch('instantBooking') ? '⚡ Instant' : '⏳ Manual'}</span>
                 </div>
                 <div className="h-px bg-border" />
               </div>
