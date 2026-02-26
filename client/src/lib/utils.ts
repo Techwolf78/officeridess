@@ -323,3 +323,86 @@ export async function getRouteOptions(origin: {lat: number, lng: number}, destin
     }];
   }
 }
+
+/**
+ * CO2 Emission Constants
+ * Based on average vehicle emissions (mixed economy/comfort vehicles)
+ */
+const CO2_EMISSION_RATE_KG_PER_KM = 0.15; // kg CO2 per km
+
+/**
+ * Calculate CO2 saved for a single booking/ride
+ * @param distanceKm - Distance traveled in kilometers
+ * @returns CO2 saved in kg, rounded to 1 decimal place
+ */
+export function calculateCO2Saved(distanceKm: number): number {
+  const co2 = distanceKm * CO2_EMISSION_RATE_KG_PER_KM;
+  return Math.round(co2 * 10) / 10; // Round to 1 decimal place
+}
+
+/**
+ * Get the month key in YYYY-MM format for grouping CO2 data
+ * @param date - Date object
+ * @returns Month key string (e.g., "2026-02")
+ */
+export function getMonthKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+/**
+ * Update user CO2 metrics when a ride is completed
+ * Handles both passenger and driver CO2 tracking with monthly breakdown
+ * @param userId - User ID (can be passenger or driver)
+ * @param passengerId - Passenger ID for this booking
+ * @param driverId - Driver ID for this ride
+ * @param seatsBooked - Number of seats booked
+ * @param distanceKm - Distance of the ride in km
+ * @param completionDate - Date of ride completion
+ */
+export function calculateCO2Updates(
+  passengerId: string,
+  driverId: string,
+  seatsBooked: number,
+  distanceKm: number,
+  completionDate: Date
+): {
+  co2SavedKg: number;
+  passengerUpdate: {
+    co2SavedKey: string;
+    co2Amount: number;
+    monthKey: string;
+  };
+  driverUpdate: {
+    co2SavedKey: string;
+    co2Amount: number;
+    monthKey: string;
+    passengerCount: number;
+  };
+} {
+  const co2Saved = calculateCO2Saved(distanceKm);
+  const monthKey = getMonthKey(completionDate);
+  
+  // Passenger gets full CO2 credit for this booking
+  const passengerCO2 = co2Saved;
+  
+  // Driver gets CO2 credit based on total seats (all passengers in the ride)
+  // Multiplied by number of seats booked in this specific booking
+  const driverCO2 = co2Saved * seatsBooked;
+  
+  return {
+    co2SavedKg: passengerCO2,
+    passengerUpdate: {
+      co2SavedKey: 'co2SavedAsPassenger',
+      co2Amount: passengerCO2,
+      monthKey,
+    },
+    driverUpdate: {
+      co2SavedKey: 'co2SavedByPassengers',
+      co2Amount: driverCO2,
+      monthKey,
+      passengerCount: seatsBooked,
+    },
+  };
+}

@@ -7,6 +7,7 @@ interface DriverBadgeProps {
   userId?: string;
   size?: "sm" | "md";
   clickable?: boolean; // If true, unverified badge links to verification page
+  simplifiedDisplay?: boolean; // If true, show only "Basic/Verified" (hides "Pending" as "Basic")
 }
 
 export function DriverBadge({
@@ -14,7 +15,15 @@ export function DriverBadge({
   userId,
   size = "sm",
   clickable = false,
+  simplifiedDisplay = false,
 }: DriverBadgeProps) {
+  // Map status to display status (for simplified view, basic + pending both show as "Basic")
+  const displayStatus = simplifiedDisplay
+    ? verificationStatus === "verified"
+      ? "verified"
+      : "basic" // Both "basic" and "pending" show as "basic"
+    : verificationStatus;
+
   const badgeConfig = {
     basic: {
       icon: <AlertCircle className={size === "sm" ? "w-3 h-3" : "w-4 h-4"} />,
@@ -36,7 +45,7 @@ export function DriverBadge({
     },
   };
 
-  const config = badgeConfig[verificationStatus];
+  const config = badgeConfig[displayStatus];
 
   const badgeContent = (
     <Badge
@@ -51,7 +60,7 @@ export function DriverBadge({
   );
 
   // Only make basic badges clickable if clickable prop is true
-  if (clickable && verificationStatus === "basic") {
+  if (clickable && displayStatus === "basic") {
     return <Link href="/verification-required">{badgeContent}</Link>;
   }
 

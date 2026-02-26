@@ -70,7 +70,7 @@ export function RideCard({ ride, showStatus, userBooking, isDriverRide, onCancel
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-sm">{ride.driver ? `${ride.driver.firstName} ${ride.driver.lastName || ''}`.trim() || "Driver" : "Driver"}</h3>
                 {ride.driver?.verificationStatus && (
-                  <DriverBadge verificationStatus={ride.driver.verificationStatus} size="sm" />
+                  <DriverBadge verificationStatus={ride.driver.verificationStatus} size="sm" simplifiedDisplay={true} />
                 )}
                 {ride.instantBooking && (
                   <Zap className="w-4 h-4 text-green-500" aria-label="Instant Booking" />

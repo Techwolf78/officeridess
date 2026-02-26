@@ -26,6 +26,12 @@ export interface FirebaseUser {
   // New aggregated rating fields for search
   averageRating?: number;
   totalRatings?: number;
+  // CO2 tracking fields
+  co2SavedAsPassenger?: number; // Total kg CO2 saved by user as a passenger
+  co2SavedByPassengers?: number; // Total kg CO2 enabled for passengers (drivers only)
+  totalPassengersServed?: number; // Total number of passengers served (drivers only)
+  co2BreakdownByMonth?: Record<string, number>; // Monthly CO2 saved: {"2026-02": 5.2, "2026-01": 3.1}
+  lastCO2Update?: string; // ISO timestamp of last CO2 aggregation
 }
 
 export interface FirebaseVehicle {
@@ -110,6 +116,10 @@ export interface FirebaseBooking {
   passengerRating?: number;
   driverRating?: number;
   
+  // CO2 tracking
+  co2SavedKg?: number; // CO2 saved in kg (calculated at ride completion)
+  co2SavedAtTime?: string; // ISO timestamp when CO2 was calculated
+  
   // Populated fields
   ride?: FirebaseRide;
   passenger?: FirebaseUser;
@@ -172,6 +182,12 @@ export const firebaseUserSchema = z.object({
   // New aggregated rating fields for search
   averageRating: z.number().min(0).max(5).optional(),
   totalRatings: z.number().min(0).optional(),
+  // CO2 tracking fields
+  co2SavedAsPassenger: z.number().min(0).optional(),
+  co2SavedByPassengers: z.number().min(0).optional(),
+  totalPassengersServed: z.number().min(0).optional(),
+  co2BreakdownByMonth: z.record(z.string(), z.number()).optional(),
+  lastCO2Update: z.string().optional(),
 });
 
 export const firebaseVehicleSchema = z.object({
@@ -229,6 +245,8 @@ export const firebaseBookingSchema = z.object({
   totalPrice: z.number().min(0),
   status: z.enum(["confirmed", "cancelled", "completed"]),
   bookingTime: z.date(),
+  co2SavedKg: z.number().min(0).optional(),
+  co2SavedAtTime: z.string().optional(),
 });
 
 // Chat system schemas

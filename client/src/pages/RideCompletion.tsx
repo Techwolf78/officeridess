@@ -12,12 +12,15 @@ import {
   Trophy,
   Star,
   ArrowRight,
-  ShieldCheck,
-  MessageSquareQuote,
-  Zap
+  Leaf,
+  Users,
+  Zap,
+  Calendar,
+  Navigation
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
 
 export default function RideCompletion() {
   const { user } = useAuth();
@@ -30,6 +33,7 @@ export default function RideCompletion() {
   const isDriver = user?.role === "driver";
   const [confirmationCountdown, setConfirmationCountdown] = useState(60);
   const [confirmed, setConfirmed] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(true);
 
   useEffect(() => {
     if (user?.role === "passenger" && !confirmed && confirmationCountdown > 0) {
@@ -48,12 +52,18 @@ export default function RideCompletion() {
     setConfirmed(true);
   };
 
+  // Calculate CO2 saved (0.15 kg per km)
+  const co2Saved = booking?.ride?.distance ? (booking.ride.distance * 0.15).toFixed(1) : "0.0";
+  const distance = booking?.ride?.distance?.toFixed(1) || "0.0";
+  const duration = booking?.ride?.eta || 0;
+  const rideName = isDriver ? booking?.passenger?.firstName : booking?.ride?.driver?.firstName;
+
   if (loading) {
     return (
       <Layout headerTitle="Completing Trip" showNav={false}>
         <div className="flex flex-col items-center justify-center min-h-[80vh] px-4">
-          <Loader2 className="animate-spin text-[#15803D] w-12 h-12" />
-          <p className="mt-6 text-lg font-bold text-slate-900 tracking-tight">Finalizing ride details...</p>
+          <Loader2 className="animate-spin text-orange-500 w-12 h-12" />
+          <p className="mt-6 text-lg font-bold text-slate-900 tracking-tight">Finalizing your achievement...</p>
         </div>
       </Layout>
     );
@@ -61,123 +71,220 @@ export default function RideCompletion() {
 
   return (
     <Layout headerTitle="Journey Complete" showNav={false}>
-      <div className="min-h-screen bg-[#FAF9F4] pb-32">
-        {/* Success Header */}
-        <div className="bg-white px-4 pt-8 pb-16 rounded-b-[3.5rem] shadow-[0_10px_40px_-15px_rgba(0,0,0,0.05)] border-b border-slate-100 flex flex-col items-center text-center">
-          <div className="relative mb-6">
-            <div className="absolute inset-0 bg-emerald-100 rounded-full animate-ping opacity-20 scale-125"></div>
-            <div className="relative w-24 h-24 bg-emerald-50 rounded-[2.5rem] flex items-center justify-center text-[#15803D] border border-emerald-100">
-              <Trophy size={48} />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50 pb-40 overflow-hidden">
+        {/* Animated confetti background */}
+        {showConfetti && (
+          <div className="fixed inset-0 pointer-events-none">
+            {[...Array(30)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute w-2 h-2 animate-pulse"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `-10px`,
+                  backgroundColor: ['#F97316', '#10B981', '#3B82F6', '#EC4899'][i % 4],
+                  animation: `fall ${2 + Math.random() * 1}s linear forwards`,
+                  animationDelay: `${Math.random() * 0.5}s`,
+                  opacity: 0.6,
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        <style>{`
+          @keyframes fall {
+            to {
+              transform: translateY(100vh) rotate(360deg);
+              opacity: 0;
+            }
+          }
+          @keyframes scaleInBounce {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+          }
+          @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes pulse-grow {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+          }
+        `}</style>
+
+        {/* Header with celebration */}
+        <div className="relative pt-8 pb-12 px-4 text-center">
+          <div 
+            className="relative w-32 h-32 mx-auto mb-8"
+            style={{ animation: 'scaleInBounce 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+          >
+            <div className="absolute inset-0 bg-orange-100/40 rounded-full animate-pulse blur-2xl"></div>
+            <div className="relative w-32 h-32 bg-gradient-to-br from-orange-400 to-orange-500 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl shadow-orange-400/30 border-4 border-white">
+              <Trophy size={64} className="drop-shadow-lg" />
             </div>
           </div>
           
-          <h1 className="text-3xl font-black text-slate-900 tracking-tighter mb-2">Destination Reached!</h1>
-          <p className="text-slate-400 font-medium text-sm px-12 leading-relaxed">
-            Youve successfully completed your commute on <span className="text-[#15803D] font-bold">Office Commute Mate</span>
+          <h1 className="text-5xl font-black text-slate-900 tracking-tighter mb-3">Destination Reached!</h1>
+          <p className="text-lg text-slate-500 font-medium">
+            Great job completing your commute with <span className="text-orange-600 font-bold">{rideName}</span>
           </p>
         </div>
 
-        <div className="px-4 -mt-10 max-w-md mx-auto space-y-4">
-          {/* Trip Summary Card */}
-          <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100 space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-50">
+        {/* Main Content - Premium Cards */}
+        <div className="px-4 max-w-md mx-auto space-y-4">
+          
+          {/* CO2 Achievement Card - Highlighted */}
+          <div 
+            className="relative bg-gradient-to-br from-green-50 to-emerald-50 rounded-[2.5rem] p-8 border-2 border-green-200 shadow-lg overflow-hidden"
+            style={{ animation: 'slideUp 0.6s ease-out 0.2s both' }}
+          >
+            <div className="absolute top-0 right-0 w-40 h-40 bg-green-400/5 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+            
+            <div className="relative flex items-center justify-between mb-6">
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Distance</p>
-                <p className="text-lg font-black text-slate-900">12.4 Km</p>
+                <p className="text-sm font-bold text-green-600 uppercase tracking-widest mb-2">🌱 CO2 Saved</p>
+                <p className="text-5xl font-black text-green-700" style={{ animation: 'pulse-grow 2s ease-in-out infinite' }}>
+                  {co2Saved}<span className="text-2xl">kg</span>
+                </p>
+                <p className="text-xs text-green-600 font-medium mt-1">Carbon offset from carpooling</p>
               </div>
-              <div className="text-right">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Duration</p>
-                <p className="text-lg font-black text-slate-900">24 Mins</p>
+              <Leaf className="w-16 h-16 text-green-400 opacity-30" />
+            </div>
+
+            <div className="bg-white/40 backdrop-blur rounded-xl p-3 space-y-2 border border-white/50">
+              <p className="text-xs text-green-700 font-semibold">Environmental Impact:</p>
+              <p className="text-sm text-green-600">Equivalent to planting <span className="font-bold">{(parseFloat(co2Saved) / 0.021).toFixed(0)}</span> trees 🌳</p>
+            </div>
+          </div>
+
+          {/* Trip Stats */}
+          <div 
+            className="bg-white rounded-[2.5rem] p-6 shadow-md border border-slate-200/60 space-y-5"
+            style={{ animation: 'slideUp 0.6s ease-out 0.3s both' }}
+          >
+            {/* Distance & Duration */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <Navigation className="w-4 h-4 text-blue-600" />
+                  <p className="text-10px font-bold text-blue-600 uppercase tracking-widest">Distance</p>
+                </div>
+                <p className="text-3xl font-black text-slate-900">{distance}<span className="text-base text-slate-400">km</span></p>
+              </div>
+              
+              <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="w-4 h-4 text-purple-600" />
+                  <p className="text-10px font-bold text-purple-600 uppercase tracking-widest">Duration</p>
+                </div>
+                <p className="text-3xl font-black text-slate-900">{duration}<span className="text-base text-slate-400">m</span></p>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
-                  <MapPin size={20} />
+            {/* Route Info */}
+            <div className="space-y-3 pt-2 border-t border-slate-100">
+              <div className="flex gap-3">
+                <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-5 h-5 text-orange-600" />
                 </div>
-                <div className="flex-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Final Destination</p>
-                  <p className="text-sm font-bold text-slate-700 leading-tight">{booking?.ride?.destination}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-10px font-bold text-slate-400 uppercase tracking-widest">From</p>
+                  <p className="text-sm font-bold text-slate-700 truncate">{booking?.ride?.origin || "Pickup"}</p>
                 </div>
               </div>
-            </div>
 
-            <div className="pt-4 border-t border-slate-50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-[#15803D]">
-                    <Zap size={20} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Co-Commuter</p>
-                    <p className="text-sm font-black text-slate-900">
-                      {isDriver ? booking.passenger?.firstName : booking.ride?.driver?.firstName}
-                    </p>
-                  </div>
+              <div className="flex gap-3">
+                <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-5 h-5 text-green-600" />
                 </div>
-                <div className="flex items-center gap-1 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
-                  <Star size={12} className="text-amber-500 fill-amber-500" />
-                  <span className="text-xs font-bold text-amber-700">Official Mate</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-10px font-bold text-slate-400 uppercase tracking-widest">To</p>
+                  <p className="text-sm font-bold text-slate-700 truncate">{booking?.ride?.destination || "Destination"}</p>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Passenger Info Card */}
+          <div 
+            className="bg-white rounded-[2.5rem] p-6 shadow-md border border-slate-200/60"
+            style={{ animation: 'slideUp 0.6s ease-out 0.4s both' }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-orange-400 to-orange-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-md">
+                  {rideName?.[0] || "?"}
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Co-Commuter</p>
+                  <p className="text-lg font-black text-slate-900">{rideName || "Unknown"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-orange-50 px-3 py-2 rounded-full border border-orange-200">
+                <Star className="w-4 h-4 text-orange-500 fill-orange-500" />
+                <span className="text-xs font-bold text-orange-600">Verified</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Confirmation Card for Passengers */}
           {!isDriver && !confirmed && (
-            <div className="bg-[#15803D] rounded-[2rem] p-6 text-white text-center space-y-4 shadow-xl shadow-[#15803D]/20">
-              <p className="text-xs font-bold uppercase tracking-0.2em opacity-80">Final Confirmation</p>
-              <h3 className="text-xl font-black tracking-tight">Are you at your destination?</h3>
-              <div className="flex gap-3">
-                <Button 
-                  onClick={handleConfirm}
-                  className="flex-1 h-14 bg-white text-[#15803D] hover:bg-emerald-50 rounded-2xl font-black text-base transition-transform active:scale-95"
-                >
-                  Yes, Ive Arrived
-                </Button>
-                <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center font-black">
-                  {confirmationCountdown}s
+            <div 
+              className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-[2.5rem] p-6 text-white shadow-xl shadow-orange-500/30 border border-orange-400"
+              style={{ animation: 'slideUp 0.6s ease-out 0.5s both' }}
+            >
+              <div className="text-center space-y-4">
+                <p className="text-sm font-bold uppercase tracking-widest opacity-90">✓ Final Step</p>
+                <h3 className="text-2xl font-black">Confirm Arrival</h3>
+                <p className="text-sm text-orange-100">Please confirm you've reached your destination</p>
+                
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    onClick={handleConfirm}
+                    className="flex-1 h-14 bg-white text-orange-600 rounded-2xl font-black text-base hover:bg-orange-50 transition-all shadow-lg active:scale-95"
+                  >
+                    ✓ Yes, Arrived
+                  </button>
+                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center font-black text-lg">
+                    {confirmationCountdown}s
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Points Impact Section */}
-          <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
-                <ShieldCheck size={24} />
+          {/* Achievement Badge */}
+          <div 
+            className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-[2.5rem] p-4 border border-blue-100 flex items-center justify-between"
+            style={{ animation: 'slideUp 0.6s ease-out 0.6s both' }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <Zap className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-xs font-bold text-slate-900">Eco-Commuter Impact</p>
-                <p className="text-10px text-slate-400 font-medium">Saved 2.4kg of CO2 today</p>
+                <p className="text-10px font-bold text-blue-600 uppercase tracking-widest">Eco-Score</p>
+                <p className="text-sm font-black text-slate-900">+{(parseFloat(co2Saved) * 10).toFixed(0)} XP</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-lg font-black text-[#15803D]">+150 XP</p>
+              <p className="text-10px font-bold text-blue-600 uppercase">Achievement</p>
+              <p className="font-bold text-blue-600">Unlocked ✓</p>
             </div>
           </div>
-
-          <button className="w-full flex items-center justify-between bg-white px-6 py-5 rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:border-[#15803D]/30 group">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-[#15803D] group-hover:bg-[#15803D]/5 transition-colors">
-                <MessageSquareQuote size={20} />
-              </div>
-              <span className="text-sm font-bold text-slate-700">Submit a Dispute</span>
-            </div>
-            <ArrowRight size={18} className="text-slate-300 group-hover:text-[#15803D] transition-all" />
-          </button>
         </div>
 
-        {/* Unified Bottom Action */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 p-6 z-50 rounded-t-[3rem] shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
-          <div className="max-w-md mx-auto">
+        {/* Bottom Action Button */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 p-4 z-50 rounded-t-[3rem] shadow-2xl">
+          <div className="max-w-md mx-auto px-4">
             {(isDriver || confirmed) && (
               <Link href={`/ride/${bookingId}/rating`}>
-                <Button className="w-full h-16 bg-[#15803D] hover:bg-[#166534] text-white rounded-[1.5rem] font-black text-lg shadow-xl shadow-[#15803D]/20 active:scale-0.98 transition-all flex items-center justify-center gap-3">
+                <button className="w-full h-16 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-[1.5rem] font-black text-lg shadow-xl shadow-orange-500/30 active:scale-95 transition-all flex items-center justify-center gap-3 border border-orange-400">
                   <Star size={24} className="fill-white" />
-                  Rate Experience
-                </Button>
+                  Rate Your Experience
+                </button>
               </Link>
             )}
           </div>

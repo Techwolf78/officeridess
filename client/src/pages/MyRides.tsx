@@ -36,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function MyRides() {
   const { user } = useAuth();
@@ -46,10 +46,22 @@ export default function MyRides() {
   const [cancelRideId, setCancelRideId] = useState<string | null>(null);
   const [cancelBookingData, setCancelBookingData] = useState<{ bookingId: string; rideTitle: string } | null>(null);
   const [cancelReason, setCancelReason] = useState<string>("");
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Always call hooks at the top level
   const { rides, loading: ridesLoading } = useRidesRealtime(isDriver ? { driverId: user?.uid, includeCancelled: true } : undefined);
   const { bookings, loading: bookingsLoading } = useBookingsRealtime();
+
+  // Simple sync indicator logic
+  useEffect(() => {
+    if (!ridesLoading && !bookingsLoading) {
+      const interval = setInterval(() => {
+        setIsSyncing(true);
+        setTimeout(() => setIsSyncing(false), 1000);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [ridesLoading, bookingsLoading]);
   const cancelRide = useCancelRide();
   const cancelBooking = useCancelBooking();
 
@@ -115,7 +127,17 @@ export default function MyRides() {
     return (
       <Layout headerTitle="My Posted Rides" showNav={true}>
         <div className="px-4 py-6">
-          {ridesLoading ? (
+          <div className="flex justify-between items-center mb-4">
+             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Active Rides</h2>
+             {isSyncing && (
+                <div className="flex items-center gap-1.5 py-1 px-2 bg-secondary/50 rounded-full animate-pulse">
+                  <Loader2 className="w-3 h-3 animate-spin text-orange-500" />
+                  <span className="text-[10px] font-medium text-orange-700">Syncing...</span>
+                </div>
+             )}
+          </div>
+
+          {ridesLoading && rides.length === 0 ? (
             <div className="space-y-4">
               <RideCardSkeleton />
               <RideCardSkeleton />
@@ -175,7 +197,17 @@ export default function MyRides() {
   return (
     <Layout headerTitle="My Bookings" showNav={true}>
       <div className="px-4 py-6">
-        {bookingsLoading ? (
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Your Trips</h2>
+          {isSyncing && (
+            <div className="flex items-center gap-1.5 py-1 px-2 bg-secondary/50 rounded-full animate-pulse">
+              <Loader2 className="w-3 h-3 animate-spin text-orange-500" />
+              <span className="text-[10px] font-medium text-orange-700">Syncing...</span>
+            </div>
+          )}
+        </div>
+
+        {bookingsLoading && bookings.length === 0 ? (
           <div className="space-y-4">
             <BookingCardSkeleton />
             <BookingCardSkeleton />

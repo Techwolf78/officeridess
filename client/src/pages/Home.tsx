@@ -115,11 +115,11 @@ export default function Home() {
   const stats = isDriver ? [
     { label: "Offered", value: user?.totalRides || 0, icon: MapPin, color: "text-blue-500", bg: "bg-blue-50" },
     { label: "Rating", value: user?.averageRating?.toFixed(1) || "5.0", icon: Star, color: "text-amber-500", bg: "bg-amber-50" },
-    { label: "Level", value: user?.verificationStatus === 'verified' ? "Pro" : "Basic", icon: Zap, color: "text-emerald-500", bg: "bg-emerald-50" },
+    { label: "CO2 Saved", value: `${(user?.co2SavedByPassengers || 0).toFixed(1)}kg`, icon: Zap, color: "text-emerald-500", bg: "bg-emerald-50" },
   ] : [
     { label: "Rides", value: user?.totalRides || 0, icon: MapPin, color: "text-primary", bg: "bg-green-50" },
     { label: "Rating", value: user?.averageRating?.toFixed(1) || "5.0", icon: Star, color: "text-amber-500", bg: "bg-amber-50" },
-    { label: "CO2 Saved", value: `${((user?.totalRides || 0) * 2.4).toFixed(1)}kg`, icon: Zap, color: "text-emerald-500", bg: "bg-emerald-50" },
+    { label: "CO2 Saved", value: `${(user?.co2SavedAsPassenger || 0).toFixed(1)}kg`, icon: Zap, color: "text-emerald-500", bg: "bg-emerald-50" },
   ];
 
   return (

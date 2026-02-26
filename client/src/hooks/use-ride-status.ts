@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { doc, updateDoc, Timestamp } from "firebase/firestore";
+import { doc, updateDoc, Timestamp, getDoc, increment, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { calculateCO2Updates, getMonthKey } from "@/lib/utils";
+import { FirebaseBooking, FirebaseRide } from "@/lib/types";
 
 type RideStatus = "confirmed" | "waiting" | "in_progress" | "completed" | "rated" | "cancelled";
 
@@ -72,6 +74,98 @@ export function useRideStatus(bookingId: string, initialStatus: RideStatus = "co
     });
   };
 
+  /**
+   * Mark ride as completed and update CO2 metrics for both passenger and driver
+   * Should be called when markCompleted is triggered, with booking and ride data available
+   */
+  const markCompletedWithCO2 = async (
+    booking: FirebaseBooking,
+    ride: FirebaseRide
+  ) => {
+    try {
+      setIsUpdating(true);
+      setError(null);
+      
+      console.log("🚀 Starting ride completion with CO2 tracking...");
+      console.log("📋 Booking ID:", bookingId);
+      console.log("👤 Passenger ID:", booking.passengerId);
+      console.log("🚗 Driver ID:", ride.driverId);
+      console.log("📍 Distance:", ride.distance, "km");
+      console.log("💺 Seats booked:", booking.seatsBooked);
+
+      const now = new Date();
+      const co2Updates = calculateCO2Updates(
+        booking.passengerId,
+        ride.driverId,
+        booking.seatsBooked,
+        ride.distance,
+        now
+      );
+
+      console.log("♻️ CO2 Updates Calculated:", {
+        passengerCO2: co2Updates.passengerUpdate.co2Amount,
+        driverCO2: co2Updates.driverUpdate.co2Amount,
+        bookingCO2: co2Updates.co2SavedKg,
+      });
+
+      const batch = writeBatch(db);
+
+      // Update booking with CO2 data
+      const bookingRef = doc(db, "bookings", bookingId);
+      batch.update(bookingRef, {
+        status: "completed",
+        completedAt: Timestamp.now(),
+        co2SavedKg: co2Updates.co2SavedKg,
+        co2SavedAtTime: now.toISOString(),
+      });
+      console.log("✅ Added booking update to batch");
+
+      // Update passenger CO2 metrics (totals only)
+      const passengerRef = doc(db, "users", booking.passengerId);
+      batch.update(passengerRef, {
+        co2SavedAsPassenger: increment(co2Updates.passengerUpdate.co2Amount),
+        lastCO2Update: now.toISOString(),
+      });
+      console.log("✅ Added passenger CO2 update to batch");
+
+      // Update driver CO2 metrics (totals only)
+      const driverRef = doc(db, "users", ride.driverId);
+      batch.update(driverRef, {
+        co2SavedByPassengers: increment(co2Updates.driverUpdate.co2Amount),
+        totalPassengersServed: increment(co2Updates.driverUpdate.passengerCount),
+        lastCO2Update: now.toISOString(),
+      });
+      console.log("✅ Added driver CO2 update to batch");
+
+      // Commit batch update
+      console.log("🔄 Committing batch update to Firestore...");
+      await batch.commit();
+      console.log("✅ SUCCESS! Firestore batch commit completed");
+
+      console.log("📊 Summary:", {
+        bookingUpdated: true,
+        passengerCO2Added: co2Updates.passengerUpdate.co2Amount,
+        driverCO2Added: co2Updates.driverUpdate.co2Amount,
+        passengersServed: co2Updates.driverUpdate.passengerCount,
+        timestamp: now.toISOString(),
+      });
+
+      // Update local state
+      setRideState(prev => ({
+        ...prev,
+        status: "completed",
+        completedAt: now,
+      }));
+    } catch (err: any) {
+      console.error("❌ ERROR during ride completion:", err);
+      console.error("Error message:", err.message);
+      console.error("Error code:", err.code);
+      setError(err.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   // Passenger confirms completion
   const confirmCompletion = () => {
     updateBookingStatus("completed", {
@@ -100,6 +194,7 @@ export function useRideStatus(bookingId: string, initialStatus: RideStatus = "co
     markArrived,
     startRide,
     markCompleted,
+    markCompletedWithCO2,
     confirmCompletion,
     markRated,
     cancelRide,

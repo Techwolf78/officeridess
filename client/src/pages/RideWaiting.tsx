@@ -3,8 +3,16 @@ import { useRideStatus } from "@/hooks/use-ride-status";
 import { useBookingRealtime } from "@/hooks/use-booking-realtime";
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useRoute, useLocation } from "wouter";
-import { MapPin, Clock, Phone, MessageCircle, AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
+import { MapPin, Clock, Phone, MessageCircle, AlertCircle, ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function RideWaiting() {
   const { user } = useAuth();
@@ -18,6 +26,8 @@ export default function RideWaiting() {
   
   const [waitingMinutes, setWaitingMinutes] = useState(0);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState("change_of_plans");
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Auto-redirect when ride starts
   useEffect(() => {
@@ -38,6 +48,24 @@ export default function RideWaiting() {
 
   const isDriver = user?.role === "driver";
   const isPassenger = user?.role === "passenger";
+
+  const handleCancelRide = async () => {
+    setIsCancelling(true);
+    try {
+      console.log("🚨 Cancellation initiated - Reason:", cancelReason);
+      await new Promise((resolve) => setTimeout(resolve, 500)); // Ensure Firestore update
+      cancelRide(cancelReason, isDriver ? "driver" : "passenger");
+      setShowCancelDialog(false);
+      // Redirect after a brief delay
+      setTimeout(() => {
+        setLocation("/rides");
+      }, 1000);
+    } catch (err) {
+      console.error("❌ Error cancelling ride:", err);
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   // Loading state
   if (loading) {
@@ -241,6 +269,44 @@ export default function RideWaiting() {
             </>
           )}
         </div>
+
+        {/* Cancel Confirmation Dialog */}
+        <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+          <AlertDialogContent className="max-w-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-5 h-5 text-red-600" />
+              <AlertDialogTitle>Cancel This Ride?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="space-y-4">
+              <p>Are you sure you want to cancel this ride? This action cannot be undone.</p>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Reason for cancellation:</label>
+                <select 
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                >
+                  <option value="change_of_plans">Change of Plans</option>
+                  <option value="emergency">Emergency Situation</option>
+                  <option value="driver_issue">Driver Issue</option>
+                  <option value="late_driver">Driver Running Late</option>
+                  <option value="found_ride">Found Another Ride</option>
+                  <option value="other">Other Reason</option>
+                </select>
+              </div>
+            </AlertDialogDescription>
+            <div className="flex gap-2">
+              <AlertDialogCancel disabled={isCancelling}>Keep Ride</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleCancelRide}
+                disabled={isCancelling}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {isCancelling ? "Cancelling..." : "Cancel Ride"}
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
