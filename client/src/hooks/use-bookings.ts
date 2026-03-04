@@ -101,6 +101,20 @@ export function useCreateBooking() {
         }
 
         // 🚫 PREVENT DUPLICATE BOOKINGS - Check if user already booked this ride
+        // Also check for any legacy bookings created with auto-generated IDs.
+        const legacyBookingsSnap = await getDocs(
+          query(
+            collection(db, "bookings"),
+            where("rideId", "==", data.rideId),
+            where("passengerId", "==", user.uid)
+          )
+        );
+        for (const docSnap of legacyBookingsSnap.docs) {
+          if (["confirmed", "completed"].includes(docSnap.data().status)) {
+            throw new Error("You have already booked this ride");
+          }
+        }
+
         // Using a deterministic ID ensures uniqueness and allows transactional verification.
         const bookingId = `${data.rideId}_${user.uid}`;
         const bookingRef = doc(db, "bookings", bookingId);

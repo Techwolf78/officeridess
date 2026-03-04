@@ -6,7 +6,6 @@ import {
   onSnapshot,
   Timestamp,
   doc,
-  writeBatch,
   getDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -80,8 +79,6 @@ export function useBookingsRealtime() {
       const unsubscribe = onSnapshot(
         q,
         async (querySnapshot) => {
-          const bookingsData: FirebaseBooking[] = [];
-          
           // Use a batch of promises to fetch ride data for all bookings
           const bookingPromises = querySnapshot.docs.map(async (docSnap) => {
             const bookingData = docSnap.data();

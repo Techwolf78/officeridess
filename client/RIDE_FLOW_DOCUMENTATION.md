@@ -124,7 +124,7 @@ To provide A–Z context, the following section narrates the full user journey f
 
 8. **Background Behaviors**
    * Every real-time hook persists data to localStorage and avoids redundant state updates using JSON string checks.
-   * `useBookingsRealtime` periodically auto‑cancels stale bookings older than 12h to prevent orphaned data.
+   * `BackgroundManager` periodically auto-cancels stale bookings 12h past departure to prevent orphaned data.
    * `useConnectionStatus` displays offline banners and queues mutations until reconnect.
 
 ---
@@ -248,7 +248,7 @@ await batch.commit();
 Check `RideWaiting.tsx` around the `canPassengerStart` constant and JSX block showing the amber button with `ShieldCheck` icon.
 
 ### 4. Expiry Cleanup
-Added new `useEffect` at the bottom of `use-bookings-realtime.ts` which filters for "zombie" bookings older than 12h and aborts them via a batch write.
+Zombie booking cleanup is implemented in `BackgroundManager.tsx` as part of the Global Automation Heartbeat. It runs every minute and cancels confirmed bookings where `departureTime + 12h` is in the past, using a batch write with `cancelReason: "Auto-cleanup: 12h past departure"`.
 
 ### 5. Booking Deadline Increase
 Updated the minutes threshold to 15 in validation block of `useCreateBooking`.
@@ -264,7 +264,7 @@ To ensure these changes work correctly:
 1. **Concurrency test:** open two browsers, attempt to book the final seat concurrently; verify only one succeeds.
 2. **Cancellation atomicity:** create a ride with multiple bookings, cancel as driver, then check all bookings are marked cancelled in Firestore.
 3. **Passenger override:** set a ride departure time in the past, navigate as passenger and ensure the override button appears and starts the ride.
-4. **Expiry cleanup:** manually create an old booking (set `bookingTime` >12h ago) and reload; confirm the hook auto-cancels it.
+4. **Expiry cleanup:** navigate to the app as an authenticated passenger with a confirmed booking whose departure time was >12 hours ago; within one minute the `BackgroundManager` heartbeat should auto-cancel it (check `cancelReason: "Auto-cleanup: 12h past departure"` in Firestore).
 5. **Deadline enforcement:** try booking a ride within 10 minutes of departure; the mutation should throw an error and the UI should disable the book button.
 6. **Verification checks:** log in as an unverified user; ensure you cannot create or book rides and are redirected appropriately.
 
@@ -321,9 +321,9 @@ The following sections describe each major capability of the ride flow as implem
 *   **Mechanism:** Computes `canPassengerStart` using a `useMemo` comparing current time to departure time plus five minutes. If true, renders an amber override button that calls `startRide()` from `useRideStatus`.
 
 ### Client-Side Expiry Cleanup
-*   **Purpose:** Automatically clean up stale bookings older than a fixed threshold when users open the app.
-*   **Location:** `src/hooks/use-bookings-realtime.ts`.
-*   **Mechanism:** After the bookings snapshot is processed, a `useEffect` waits five seconds then filters for confirmed bookings with `bookingTime` >12 hours in the past. A batch write cancels them with a system reason.
+*   **Purpose:** Automatically clean up stale bookings older than a fixed threshold when users are active in the app.
+*   **Location:** `src/components/BackgroundManager.tsx` (Global Automation Heartbeat).
+*   **Mechanism:** A `setInterval` runs every minute and iterates over confirmed bookings. If `departureTime + 12h` is in the past, a batch write cancels the booking with `cancelReason: "Auto-cleanup: 12h past departure"`.
 
 ### Booking Deadline Enforcement
 *   **Purpose:** Prevent passengers from booking too close to departure, giving drivers planning time.
@@ -430,8 +430,8 @@ Each complex flow in the codebase has been audited and verified for reliability 
 *   **Logic:** If a driver hasn't started the ride 5 minutes after the scheduled `departureTime`, passengers are granted a "Start Ride Now" button to transition the state and access maps.
 
 ### 4. Zombie Cleanup (Client-Side Cron)
-*   **Implementation:** [use-bookings-realtime.ts](client/src/hooks/use-bookings-realtime.ts#L137)
-*   **Logic:** A background `useEffect` monitors active bookings. If any stay "confirmed" for >12 hours past their window, the client automatically triggers a batch write to cancel them, keeping the database clean.
+*   **Implementation:** [BackgroundManager.tsx](client/src/components/BackgroundManager.tsx)
+*   **Logic:** A `setInterval` in `BackgroundManager` runs every minute. If any confirmed booking has `departureTime + 12h` in the past, the client triggers a batch write to cancel them with `cancelReason: "Auto-cleanup: 12h past departure"`, keeping the database clean.
 
 ---
 

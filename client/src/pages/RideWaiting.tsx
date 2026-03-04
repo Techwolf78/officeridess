@@ -44,15 +44,15 @@ export default function RideWaiting() {
     }
   }, [booking?.status, bookingId, setLocation]);
 
-  // Simulate driver arriving
+  // Simulate driver arriving - driven by both local state and Firestore booking status
   useEffect(() => {
-    if (rideState.status === "waiting") {
+    if (rideState.status === "waiting" || booking?.status === "waiting") {
       const interval = setInterval(() => {
         setWaitingMinutes(prev => prev + 1);
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [rideState.status]);
+  }, [rideState.status, booking?.status]);
 
   const isDriver = user?.role === "driver";
   const isPassenger = user?.role === "passenger";
@@ -113,7 +113,7 @@ export default function RideWaiting() {
     );
   }
 
-  if (rideState.status === "waiting") {
+  if (rideState.status === "waiting" || booking?.status === "waiting") {
     return (
       <Layout headerTitle="Driver Arriving..." showNav={false}>
         <div className="px-4 py-6 pb-24 max-w-2xl mx-auto space-y-6">
