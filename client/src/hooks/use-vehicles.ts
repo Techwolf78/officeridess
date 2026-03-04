@@ -23,9 +23,8 @@ export function useVehicles() {
 
         return vehicles;
       } catch (error) {
-        console.warn('Failed to fetch vehicles from Firestore:', error);
-        // Return empty array if Firestore fails
-        return [];
+        console.error('Failed to fetch vehicles from Firestore:', error);
+        throw error;
       }
     },
     enabled: !!user,
@@ -47,12 +46,10 @@ export function useCreateVehicle() {
 
       try {
         const docRef = await addDoc(collection(db, "vehicles"), vehicleData);
-        return { id: docRef.id, ...vehicleData };
+        return { id: docRef.id, ...vehicleData } as FirebaseVehicle;
       } catch (error) {
-        console.warn('Failed to create vehicle in Firestore:', error);
-        // Generate a local ID if Firestore fails
-        const localId = `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        return { id: localId, ...vehicleData };
+        console.error('Failed to create vehicle in Firestore:', error);
+        throw error;
       }
     },
     onSuccess: () => {

@@ -30,8 +30,8 @@ export function ProtectedRoute({ path, component: Component, requireCompleteProf
           return <Redirect to="/" />;
         }
 
-        // Check for completed profile (firstName is required)
-        if (requireCompleteProfile && user && !user.firstName) {
+        // Check for completed profile (firstName and phoneNumber are required)
+        if (requireCompleteProfile && user && (!user.firstName || !user.phoneNumber)) {
           return <Redirect to="/register" />;
         }
 
@@ -57,7 +57,7 @@ export function PublicRoute({ path, component: Component }: { path: string, comp
 
         if (user) {
           // If already logged in, redirect away from public pages
-          if (!user.firstName) {
+          if (!user.firstName || !user.phoneNumber) {
             // Only redirect to register if we aren't already there (though register is now a ProtectedRoute)
             return <Redirect to="/register" />;
           }

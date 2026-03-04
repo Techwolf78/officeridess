@@ -1,15 +1,16 @@
 import { createContext, useContext, ReactNode, useState, useEffect, useRef } from "react";
 import { useMutation, useQueryClient, UseMutationResult } from "@tanstack/react-query";
 import { doc, getDoc, setDoc, updateDoc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { FirebaseUser, LoginRequest, UpdateProfileRequest } from "@/lib/types";
+import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "firebase/auth";
+import { db, auth } from "@/lib/firebase";
+import { FirebaseUser, UpdateProfileRequest } from "@/lib/types";
 import { useLocation } from "wouter";
 
 type AuthContextType = {
   user: FirebaseUser | null;
   isLoading: boolean;
   error: string | null;
-  mockLogin: UseMutationResult<any, Error, LoginRequest>;
+  googleLogin: UseMutationResult<any, Error, void>;
   logout: UseMutationResult<void, Error, void>;
   updateProfile: UseMutationResult<any, Error, UpdateProfileRequest>;
 };
@@ -17,161 +18,90 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<FirebaseUser | null>(() => {
-    try {
-      const savedUser = localStorage.getItem('mockUser');
-      return savedUser ? (JSON.parse(savedUser) as FirebaseUser) : null;
-    } catch (e) {
-      console.warn('Error reading from localStorage:', e);
-      return null;
-    }
-  });
-
-  const [isLoading, setIsLoading] = useState(() => {
-    // If we have a user in localStorage, we can start with isLoading: false
-    return !localStorage.getItem('mockUser');
-  });
-
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
-  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const unsubscribeFirestoreRef = useRef<(() => void) | null>(null);
 
-  // Sync with Firestore whenever user UID changes
   useEffect(() => {
-    if (!user?.uid) {
-      setIsLoading(false);
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
-      return;
-    }
-
-    const unsubscribe = onSnapshot(
-      doc(db, 'users', user.uid),
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          // Split displayName into firstName and lastName if available
-          const nameParts = data.displayName ? data.displayName.split(' ') : [];
-          const firstName = nameParts[0] || '';
-          const lastName = nameParts.slice(1).join(' ') || '';
-          
-          const firestoreUser = {
-            uid: docSnap.id,
-            ...data,
-            firstName: data.firstName || firstName,
-            lastName: data.lastName || lastName,
-            createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt),
-          } as FirebaseUser;
-          
-          setUser(firestoreUser);
-          localStorage.setItem('mockUser', JSON.stringify(firestoreUser));
-        }
-        setIsLoading(false);
-        setError(null);
-      },
-      (err) => {
-        console.warn('Error listening to user changes:', err);
-        setError('Failed to sync with server - using cached data');
-        setIsLoading(false);
-      }
-    );
-
-    unsubscribeRef.current = unsubscribe;
-    return () => {
-      unsubscribe();
-    };
-  }, [user?.uid]);
-
-  const mockLoginMutation = useMutation({
-    mutationFn: async (data: LoginRequest) => {
-      const mockUid = `mock_${data.phoneNumber.replace('+', '').replace(/\D/g, '')}`;
-
-      try {
-        const userDoc = await getDoc(doc(db, 'users', mockUid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data() as Omit<FirebaseUser, 'uid'>;
-          // Split displayName into firstName and lastName if available
-          const nameParts = userData.displayName ? userData.displayName.split(' ') : [];
-          const firstName = nameParts[0] || '';
-          const lastName = nameParts.slice(1).join(' ') || '';
-          
-          const fullUser = { 
-            uid: mockUid, 
-            ...userData,
-            firstName: userData.firstName || firstName,
-            lastName: userData.lastName || lastName,
-          };
-          setUser(fullUser);
-          localStorage.setItem('mockUser', JSON.stringify(fullUser));
-          return fullUser;
-        } else {
-          const newUser: FirebaseUser = {
-            uid: mockUid,
-            phoneNumber: data.phoneNumber,
-            role: 'passenger',
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const userRef = doc(db, "users", firebaseUser.uid);
+        const userDoc = await getDoc(userRef);
+        
+        if (!userDoc.exists()) {
+          const newUser: Partial<FirebaseUser> = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || undefined,
+            displayName: firebaseUser.displayName || undefined,
+            photoURL: firebaseUser.photoURL || undefined,
+            role: "passenger",
             isDriverVerified: false,
-            verificationStatus: 'basic',
+            verificationStatus: "basic",
             createdAt: new Date(),
           };
-          await setDoc(doc(db, 'users', mockUid), newUser);
-          setUser(newUser);
-          localStorage.setItem('mockUser', JSON.stringify(newUser));
-          return newUser;
+          await setDoc(userRef, newUser);
         }
-      } catch (err) {
-        console.warn('Firestore fallback:', err);
-        const newUser: FirebaseUser = {
-          uid: mockUid,
-          phoneNumber: data.phoneNumber,
-          role: 'passenger',
-          isDriverVerified: false,
-          verificationStatus: 'basic',
-          createdAt: new Date(),
-        };
-        setUser(newUser);
-        localStorage.setItem('mockUser', JSON.stringify(newUser));
-        return newUser;
+
+        if (unsubscribeFirestoreRef.current) unsubscribeFirestoreRef.current();
+        
+        unsubscribeFirestoreRef.current = onSnapshot(userRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            const firestoreUser = {
+              uid: docSnap.id,
+              ...data,
+              createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt),
+            } as FirebaseUser;
+            setUser(firestoreUser);
+          }
+          setIsLoading(false);
+        });
+      } else {
+        setUser(null);
+        if (unsubscribeFirestoreRef.current) {
+          unsubscribeFirestoreRef.current();
+          unsubscribeFirestoreRef.current = null;
+        }
+        setIsLoading(false);
       }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeFirestoreRef.current) unsubscribeFirestoreRef.current();
+    };
+  }, []);
+
+  const googleLoginMutation = useMutation({
+    mutationFn: async () => {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      return result.user; 
     }
   });
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
+      await signOut(auth);
       queryClient.clear();
       setUser(null);
-      localStorage.removeItem('mockUser');
       setError(null);
     },
     onSuccess: () => {
-      setLocation("/");
-    },
+      setLocation("/login");
+    }
   });
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: UpdateProfileRequest) => {
       if (!user) throw new Error("Not authenticated");
-
       const updateData = { ...data };
       delete (updateData as any).uid;
       delete (updateData as any).createdAt;
-
-      const updatedUser = { ...user, ...updateData };
-      setUser(updatedUser);
-      localStorage.setItem('mockUser', JSON.stringify(updatedUser));
-
-      try {
-        await updateDoc(doc(db, 'users', user.uid), updateData);
-      } catch (err) {
-        console.warn('Firestore update failed, but local state updated:', err);
-      }
-
+      await updateDoc(doc(db, "users", user.uid), updateData);
       return { success: true };
     },
   });
@@ -181,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user, 
       isLoading, 
       error, 
-      mockLogin: mockLoginMutation, 
+      googleLogin: googleLoginMutation,
       logout: logoutMutation, 
       updateProfile: updateProfileMutation 
     }}>

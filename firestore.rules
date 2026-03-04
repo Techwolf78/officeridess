@@ -30,10 +30,11 @@ service cloud.firestore {
       );
     }
 
-    // Vehicles may now be read by any authenticated user; writes still restricted to owner
+    // Vehicles: read by anyone authenticated; create if authenticated, update if owner
     match /vehicles/{vehicleId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     // Ratings can be read by anyone, created by the reviewer
