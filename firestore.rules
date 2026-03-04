@@ -1,10 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // TEMPORARY: Allow all reads to solve persistence of permission errors in UI
-    // Writes are still protected by existing logic
+    // ULTIMATE DEEP DEBUG: Allow all reads globally (even unauthenticated) 
+    // to determine if the issue is rule propagation or auth state.
     match /{document=**} {
-      allow read: if request.auth != null;
+      allow read: if true;
     }
 
     // Users: writes still limited to self
