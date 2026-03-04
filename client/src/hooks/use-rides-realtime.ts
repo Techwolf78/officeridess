@@ -75,7 +75,7 @@ export function useRidesRealtime(filters?: {
     try {
       const constraints = [];
       if (!filters?.includeCancelled) {
-        constraints.push(where("status", "!=", "cancelled"));
+        constraints.push(where("status", "==", "scheduled"));
       }
       constraints.push(where("departureTime", ">", Timestamp.now()));
       if (filters?.driverId) {

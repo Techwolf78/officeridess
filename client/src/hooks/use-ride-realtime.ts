@@ -13,6 +13,21 @@ const driverCache = new Map<string, { data: FirebaseUser; timestamp: number }>()
 const vehicleCache = new Map<string, { data: FirebaseVehicle; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes TTL
 
+// Periodically prune expired cache entries to avoid unbounded memory growth
+// Guard ensures only one interval is created even if the module is re-evaluated
+if (typeof window !== "undefined" && !(window as any).__rideRealtimeCachePrunerStarted) {
+  (window as any).__rideRealtimeCachePrunerStarted = true;
+  window.setInterval(() => {
+    const now = Date.now();
+    driverCache.forEach((entry, key) => {
+      if (now - entry.timestamp > CACHE_TTL) driverCache.delete(key);
+    });
+    vehicleCache.forEach((entry, key) => {
+      if (now - entry.timestamp > CACHE_TTL) vehicleCache.delete(key);
+    });
+  }, 60 * 1000);
+}
+
 export function useRideRealtime(rideId: string) {
   const [ride, setRide] = useState<FirebaseRide | null>(null);
   const [loading, setLoading] = useState(true);

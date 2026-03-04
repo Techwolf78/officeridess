@@ -4,7 +4,6 @@ import { useBookingsRealtime } from "@/hooks/use-booking-realtime";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { doc, writeBatch, Timestamp } from "firebase/firestore";
-import { Bell, ShieldAlert } from "lucide-react";
 
 export function BackgroundManager() {
   const { user } = useAuth();
@@ -12,12 +11,8 @@ export function BackgroundManager() {
   const { toast } = useToast();
   const notifiedBookings = useRef<Set<string>>(new Set());
 
-  // 1. Request Browser Notification Permissions
-  useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
+  // 1. Notification Permissions are not requested automatically.
+  // Permission should only be requested in response to an explicit user action.
 
   // 2. Global Automation Heartbeat (Runs every 1 minute)
   useEffect(() => {

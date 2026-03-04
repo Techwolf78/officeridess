@@ -55,7 +55,7 @@ export default function RideCompletion() {
   // Calculate CO2 saved (0.15 kg per km)
   // Use booking.co2SavedKg if available (calculated on server/at completion), 
   // otherwise fallback to client calculation
-  const co2SavedValue = booking?.co2SavedKg || (booking?.ride?.distance ? booking.ride.distance * 0.15 : 0);
+  const co2SavedValue = booking?.co2SavedKg ?? (booking?.ride?.distance ? booking.ride.distance * 0.15 : 0);
   const co2Saved = Number(co2SavedValue).toFixed(1);
   const distance = booking?.ride?.distance?.toFixed(1) || "0.0";
   const duration = booking?.ride?.eta ? Math.round(booking.ride.eta) : 0;
