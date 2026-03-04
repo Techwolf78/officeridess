@@ -13,6 +13,7 @@ const step1Schema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
   lastName: z.string().min(2, "Last name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email"),
+  phoneNumber: z.string().regex(/^[6-9]\d{9}$/, "Please enter a valid 10-digit Indian mobile number"),
   gender: z.enum(["male", "female", "other"], { required_error: "Please select your gender" }),
 });
 
@@ -34,6 +35,11 @@ export default function Register() {
 
   const step1Form = useForm<Step1Form>({
     resolver: zodResolver(step1Schema),
+    defaultValues: {
+      email: user?.email || "",
+      firstName: user?.displayName?.split(" ")[0] || "",
+      lastName: user?.displayName?.split(" ").slice(1).join(" ") || "",
+    }
   });
 
   const step2Form = useForm<Step2Form>({
@@ -45,7 +51,7 @@ export default function Register() {
     if (!isLoading) {
       if (!user) {
         setLocation("/login");
-      } else if (user.firstName) {
+      } else if (user.firstName && user.phoneNumber) {
         setLocation("/home");
       }
     }
@@ -65,17 +71,17 @@ export default function Register() {
       firstName: step1Data.firstName,
       lastName: step1Data.lastName,
       email: step1Data.email,
+      phoneNumber: `+91${step1Data.phoneNumber}`,
       gender: step1Data.gender,
       homeAddress: data.homeAddress,
       officeAddress: data.officeAddress,
-      phoneNumber: user?.phoneNumber,
     };
 
     updateProfile.mutate(completeProfile, {
       onSuccess: () => {
         localStorage.removeItem('registration_step1'); // Clean up
         toast({
-          title: "Welcome to OFFICERIDES!",
+          title: "Welcome to OFFICE RIDES!",
           description: "Your profile has been set up successfully.",
         });
         // Navigation will happen automatically when user state updates
@@ -171,6 +177,22 @@ export default function Register() {
                 />
                 {step1Form.formState.errors.email && (
                   <p className="text-red-500 text-xs ml-1">{step1Form.formState.errors.email.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground ml-1">Phone Number</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">+91</span>
+                  <input
+                    type="tel"
+                    placeholder="9876543210"
+                    {...step1Form.register("phoneNumber")}
+                    className="w-full pl-12 pr-4 py-3.5 bg-secondary rounded-xl border-transparent focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none"
+                  />
+                </div>
+                {step1Form.formState.errors.phoneNumber && (
+                  <p className="text-red-500 text-xs ml-1">{step1Form.formState.errors.phoneNumber.message}</p>
                 )}
               </div>
 

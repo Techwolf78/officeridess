@@ -3,7 +3,7 @@ import { z } from "zod";
 // Firebase data types (adapted from original schema)
 export interface FirebaseUser {
   uid: string;
-  phoneNumber: string;
+  phoneNumber?: string;
   firstName?: string;
   lastName?: string;
   displayName?: string;
@@ -19,6 +19,7 @@ export interface FirebaseUser {
   officeAddress?: string;
   profileImage?: string;
   profilePicture?: string;
+  photoURL?: string;
   createdAt: Date;
   rating?: number;
   totalRides?: number;

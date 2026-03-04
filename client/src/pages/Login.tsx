@@ -1,64 +1,22 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Car, ArrowRight, Loader2, AlertCircle, CheckCircle2, ShieldCheck, MapPin, Sparkles } from "lucide-react";
+import { Car, ArrowRight, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
-const isValidIndianMobileNumber = (phoneNumber: string): boolean => {
-  if (!phoneNumber || phoneNumber.length !== 10) return false;
-  const firstDigit = parseInt(phoneNumber[0]);
-  return [6, 7, 8, 9].includes(firstDigit);
-};
-
-const phoneSchema = z.object({
-  phoneNumber: z.string()
-    .regex(/^\d{10}$/, "Please enter a valid phone number")
-    .refine(isValidIndianMobileNumber, "Please enter a valid phone number")
-    .transform((val) => `+91${val}`),
-});
-
-type PhoneForm = z.infer<typeof phoneSchema>;
-
 export default function Login() {
-  const { mockLogin, user, isLoading } = useAuth();
+  const { googleLogin, user, isLoading } = useAuth();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
-  const [showError, setShowError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [phoneValue, setPhoneValue] = useState("");
 
-  const phoneForm = useForm<PhoneForm>({
-    resolver: zodResolver(phoneSchema),
-    mode: "onChange",
-  });
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, "");
-    if (value.length > 10) value = value.slice(0, 10);
-    setPhoneValue(value);
-    phoneForm.setValue("phoneNumber", value);
-    phoneForm.trigger("phoneNumber");
-  };
-
-  const isPhoneValid = isValidIndianMobileNumber(phoneValue);
-  const phoneError = phoneForm.formState.errors.phoneNumber;
-
-  const onSubmit = (data: PhoneForm) => {
-    setShowError(false);
-    mockLogin.mutate(data, {
+  const handleGoogleLogin = () => {
+    googleLogin.mutate(undefined, {
       onSuccess: () => {
-        toast({ title: "Welcome back!", description: "Authentication successful." });
+        toast({ title: "Welcome!", description: "Authenticated with Google." });
       },
       onError: (err) => {
-        const errorMsg = err instanceof Error ? err.message : "Login failed. Please try again.";
-        setErrorMessage(errorMsg);
-        setShowError(true);
-        toast({ title: "Error", description: errorMsg, variant: "destructive" });
-      },
+        toast({ title: "Login Failed", description: err.message, variant: "destructive" });
+      }
     });
   };
 
@@ -76,7 +34,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF9F4] flex flex-col p-6 font-sans">
+    <div className="min-h-screen bg-[#FAF9F4] flex flex-col p-6">
       <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
         
         <div className="mb-16">
@@ -85,7 +43,7 @@ export default function Login() {
                 <Car size={24} className="text-[#15803D]" />
              </div>
              <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">OFFICE<span className="text-[#15803D]">MATES</span></h1>
+                <h1 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">OFFICE<span className="text-[#15803D]">RIDES</span></h1>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Premium Corporate Commuting</p>
              </div>
           </div>
@@ -98,36 +56,41 @@ export default function Login() {
           </p>
         </div>
 
-        <div className="bg-white rounded-[3rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 mb-8 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#15803D]/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
-          
-          <form onSubmit={phoneForm.handleSubmit(onSubmit)} className="space-y-6 relative z-10">
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Phone Number</label>
-              <div className="relative group">
-                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#15803D] transition-colors">
-                    <span className="text-sm font-black">+91</span>
-                 </div>
-                 <input 
-                    type="tel"
-                    value={phoneValue}
-                    onChange={handlePhoneChange}
-                    placeholder="Enter 10-digit number"
-                    className="w-full h-16 bg-slate-50 rounded-2xl pl-14 pr-4 text-lg font-black text-slate-900 border-none focus:ring-4 focus:ring-[#15803D]/10 transition-all placeholder:text-slate-300"
-                 />
+        <div className="space-y-4 mb-16">
+          <Button
+            onClick={handleGoogleLogin}
+            disabled={googleLogin.isPending}
+            className="w-full h-18 bg-white hover:bg-slate-50 text-slate-900 border-2 border-slate-100 rounded-[2rem] font-black text-lg shadow-xl shadow-slate-200/50 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-4 px-6"
+          >
+            {googleLogin.isPending ? (
+              <Loader2 className="animate-spin text-[#15803D]" size={24} />
+            ) : (
+              <div className="flex items-center gap-4">
+                <svg className="w-6 h-6" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                <span>Continue with Google</span>
               </div>
-              {phoneError && <p className="text-[10px] font-black text-red-500 uppercase tracking-widest ml-1">{phoneError.message}</p>}
-            </div>
-
-            <Button 
-               type="submit"
-               disabled={!isPhoneValid || mockLogin.isPending}
-               className="w-full h-18 bg-[#15803D] hover:bg-[#166534] text-white rounded-[2rem] font-black text-lg shadow-xl shadow-[#15803D]/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-between px-6"
-            >
-               <span>{mockLogin.isPending ? "Connecting..." : "Continue with OTP"}</span>
-               {mockLogin.isPending ? <Loader2 className="animate-spin" size={20} /> : <ArrowRight size={20} strokeWidth={3} />}
-            </Button>
-          </form>
+            )}
+          </Button>
+          <p className="text-center text-slate-400 font-bold text-[10px] uppercase tracking-widest">
+            Corporate email authentication required
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-12">
