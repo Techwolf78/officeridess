@@ -85,6 +85,17 @@ export default function RideDetails() {
   };
 
   const handleBook = () => {
+    // Shield against unverified passengers
+    if (user?.role === 'passenger' && user?.verificationStatus !== 'verified') {
+      toast({ 
+        title: "Verification Required", 
+        description: "You must complete your identity verification before booking a ride.", 
+        variant: "destructive" 
+      });
+      setLocation("/verification-required");
+      return;
+    }
+
     bookRide({ rideId: ride.id, seats }, {
       onSuccess: () => {
         setShowConfirm(false);

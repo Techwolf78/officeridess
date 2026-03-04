@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 export default function PrivacyPolicy() {
   return (
     <Layout headerTitle="Privacy Policy" showNav={true}>
-      <div className="px-4 py-6 pb-24 max-w-2xl mx-auto font-sans">
+      <div className="px-4 py-6 pb-24 max-w-2xl mx-auto">
         <Link href="/">
           <button className="flex items-center gap-2 text-primary hover:text-primary/80 mb-6 cursor-pointer transition-colors">
             <ArrowLeft size={20} />
@@ -19,7 +19,7 @@ export default function PrivacyPolicy() {
               <h2 className="text-2xl font-bold text-foreground">Privacy Policy</h2>
               <p className="text-xs text-muted-foreground mt-1">Last updated: Feb 16, 2026 • Effective date: Feb 16, 2026</p>
             </div>
-            <p className="text-sm text-muted-foreground">OFFICERIDES ("we", "us", "our") provides ride-matching services. This Privacy Policy explains what personal data we collect, why we collect it, how we use and share it, how long we retain it, and your rights.</p>
+            <p className="text-sm text-muted-foreground">OFFICE RIDES ("we", "us", "our") provides ride-matching services. This Privacy Policy explains what personal data we collect, why we collect it, how we use and share it, how long we retain it, and your rights.</p>
           </div>
 
           <div>
@@ -65,7 +65,7 @@ export default function PrivacyPolicy() {
             <h3 className="text-sm font-semibold text-foreground mb-1">4. Sharing & third parties</h3>
             <p className="text-sm text-muted-foreground">We share data only with trusted partners and as required by law. Typical recipients include:</p>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li>Payment processors (only if you choose to pay via an integrated provider); card details are handled directly by that provider and are not stored by OFFICERIDES.</li>
+              <li>Payment processors (only if you choose to pay via an integrated provider); card details are handled directly by that provider and are not stored by OFFICE RIDES.</li>
               <li>Cloud and analytics providers for hosting and performance monitoring.</li>
               <li>Law enforcement or courts when legally required.</li>
             </ul>

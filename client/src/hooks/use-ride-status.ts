@@ -3,6 +3,7 @@ import { doc, updateDoc, Timestamp, getDoc, increment, writeBatch } from "fireba
 import { db } from "@/lib/firebase";
 import { calculateCO2Updates, getMonthKey } from "@/lib/utils";
 import { FirebaseBooking, FirebaseRide } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
 
 type RideStatus = "confirmed" | "waiting" | "in_progress" | "completed" | "rated" | "cancelled";
 
@@ -24,6 +25,7 @@ export function useRideStatus(bookingId: string, initialStatus: RideStatus = "co
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   /**
    * Helper to update Firestore and local state
@@ -48,6 +50,11 @@ export function useRideStatus(bookingId: string, initialStatus: RideStatus = "co
     } catch (err: any) {
       console.error("Error updating booking status:", err);
       setError(err.message);
+      toast({
+        title: "Update Failed",
+        description: err.message || "Failed to update ride status. Please check your connection.",
+        variant: "destructive",
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -161,6 +168,11 @@ export function useRideStatus(bookingId: string, initialStatus: RideStatus = "co
       console.error("Error message:", err.message);
       console.error("Error code:", err.code);
       setError(err.message);
+      toast({
+        title: "Completion Failed",
+        description: err.message || "Failed to finalize ride completion and CO2 tracking.",
+        variant: "destructive",
+      });
     } finally {
       setIsUpdating(false);
     }

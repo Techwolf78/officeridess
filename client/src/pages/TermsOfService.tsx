@@ -19,12 +19,12 @@ export default function TermsOfService() {
               <h2 className="text-2xl font-bold text-foreground">Terms of Service</h2>
               <p className="text-xs text-muted-foreground mt-1">Last updated: Feb 22, 2026 • Effective date: Feb 22, 2026</p>
             </div>
-            <p className="text-sm text-muted-foreground">These Terms of Service govern your use of OFFICERIDES ("Service"). By accessing or using OFFICERIDES, you agree to be bound by these terms. If you do not agree, please do not use the Service.</p>
+            <p className="text-sm text-muted-foreground">These Terms of Service govern your use of OFFICE RIDES ("Service"). By accessing or using OFFICE RIDES, you agree to be bound by these terms. If you do not agree, please do not use the Service.</p>
           </div>
 
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1">1. Use License</h3>
-            <p className="text-sm text-muted-foreground">We grant you a limited, non-exclusive, non-transferable license to use OFFICERIDES for personal, non-commercial purposes. You may not:</p>
+            <p className="text-sm text-muted-foreground">We grant you a limited, non-exclusive, non-transferable license to use OFFICE RIDES for personal, non-commercial purposes. You may not:</p>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 mt-2">
               <li>Reverse engineer, decompile, or disassemble the Service.</li>
               <li>Use automated scripts, bots, or scrapers without written permission.</li>
@@ -48,7 +48,7 @@ export default function TermsOfService() {
 
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1">3. Ride Matching & Booking</h3>
-            <p className="text-sm text-muted-foreground">OFFICERIDES is a platform for ride-sharing. By booking a ride:</p>
+            <p className="text-sm text-muted-foreground">OFFICE RIDES is a platform for ride-sharing. By booking a ride:</p>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 mt-2">
               <li>You agree to follow traffic laws and respect the driver/passenger.</li>
               <li>Drivers and passengers are responsible for their own safety and conduct.</li>
@@ -71,7 +71,7 @@ export default function TermsOfService() {
 
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1">5. Liability Disclaimer</h3>
-            <p className="text-sm text-muted-foreground">To the fullest extent permitted by law, OFFICERIDES and its affiliates are provided "as-is" without warranties of any kind. We disclaim liability for:</p>
+            <p className="text-sm text-muted-foreground">To the fullest extent permitted by law, OFFICE RIDES and its affiliates are provided "as-is" without warranties of any kind. We disclaim liability for:</p>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 mt-2">
               <li>Accidents, injuries, or damages during or related to rides.</li>
               <li>Loss or damage to personal property.</li>
@@ -79,7 +79,7 @@ export default function TermsOfService() {
               <li>Service interruptions, errors, or technical failures.</li>
               <li>Third-party payment processor failures or fraud.</li>
             </ul>
-            <p className="text-sm text-muted-foreground mt-2">OFFICERIDES is not responsible for the actions of drivers or passengers. Use the Service at your own risk.</p>
+            <p className="text-sm text-muted-foreground mt-2">OFFICE RIDES is not responsible for the actions of drivers or passengers. Use the Service at your own risk.</p>
           </div>
 
           <div>
@@ -102,7 +102,7 @@ export default function TermsOfService() {
 
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1">8. Intellectual Property</h3>
-            <p className="text-sm text-muted-foreground">All content in OFFICERIDES, including logos, text, graphics, and code, is owned by OFFICERIDES or its licensors. You may not copy, distribute, or use this content without written permission.</p>
+            <p className="text-sm text-muted-foreground">All content in OFFICE RIDES, including logos, text, graphics, and code, is owned by OFFICE RIDES or its licensors. You may not copy, distribute, or use this content without written permission.</p>
           </div>
 
           <div>
@@ -112,7 +112,7 @@ export default function TermsOfService() {
 
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-1">10. Indemnification</h3>
-            <p className="text-sm text-muted-foreground">You agree to defend, indemnify, and hold harmless OFFICERIDES, its officers, and agents from any claims, losses, damages, or liabilities arising from your use of the Service, violation of these Terms, or infringement of third-party rights.</p>
+            <p className="text-sm text-muted-foreground">You agree to defend, indemnify, and hold harmless OFFICE RIDES, its officers, and agents from any claims, losses, damages, or liabilities arising from your use of the Service, violation of these Terms, or infringement of third-party rights.</p>
           </div>
 
           <div>

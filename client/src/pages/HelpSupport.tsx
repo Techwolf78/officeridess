@@ -105,7 +105,7 @@ export default function HelpSupport() {
 
   return (
     <Layout headerTitle="Help & Support" showNav={true}>
-      <div className="px-4 py-6 pb-24 max-w-2xl mx-auto font-sans">
+      <div className="px-4 py-6 pb-24 max-w-2xl mx-auto">
         <Link href="/settings">
           <button className="flex items-center gap-2 text-primary hover:text-primary/80 mb-6 cursor-pointer transition-colors">
             <ArrowLeft size={20} />
@@ -121,7 +121,7 @@ export default function HelpSupport() {
                 <Phone size={16} />
               </div>
               <p className="text-sm font-medium">Call Us</p>
-              <p className="text-xs text-muted-foreground">+1-800-OFFICERIDES</p>
+              <p className="text-xs text-muted-foreground">+1-800-OFFICE-RIDES</p>
             </a>
             <a href="mailto:support@officerides.com" className="flex flex-col items-start gap-1 p-3 rounded-lg hover:bg-secondary/20 transition-colors">
               <div className="w-8 h-8 rounded-md bg-primary/5 flex items-center justify-center text-primary">
@@ -221,7 +221,7 @@ export default function HelpSupport() {
             )}
           </div>
 
-          <div className="text-center text-xs text-muted-foreground mt-1">You can also email <span className="text-primary font-medium">support@officerides.com</span> or call <span className="text-primary font-medium">+1-800-OFFICERIDES</span></div>
+          <div className="text-center text-xs text-muted-foreground mt-1">You can also email <span className="text-primary font-medium">support@officerides.com</span> or call <span className="text-primary font-medium">+1-800-OFFICE-RIDES</span></div>
         </div>
       </div>
     </Layout>

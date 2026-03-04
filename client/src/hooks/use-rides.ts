@@ -10,7 +10,8 @@ import {
   addDoc,
   updateDoc,
   Timestamp,
-  limit
+  limit,
+  writeBatch
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
@@ -239,28 +240,33 @@ export function useCancelRide() {
         throw new Error("This ride cannot be cancelled");
       }
 
-      // Cancel all active bookings for this ride
+      // Cancel all active bookings for this ride atomically using writeBatch
       const bookingsQuery = query(
         collection(db, "bookings"),
         where("rideId", "==", rideId),
         where("status", "in", ["confirmed"])
       );
       const bookingsSnapshot = await getDocs(bookingsQuery);
+      
+      const batch = writeBatch(db);
 
-      const cancelPromises = bookingsSnapshot.docs.map(async (bookingDoc) => {
-        const bookingData = bookingDoc.data();
-        await updateDoc(doc(db, "bookings", bookingDoc.id), { status: "cancelled" });
-        // Return seats back to ride (though ride will be cancelled)
-        await updateDoc(rideRef, {
-          availableSeats: rideData.availableSeats + bookingData.seatsBooked,
+      bookingsSnapshot.docs.forEach((bookingDoc) => {
+        const bookingRef = doc(db, "bookings", bookingDoc.id);
+        batch.update(bookingRef, { 
+          status: "cancelled",
+          cancelledAt: Timestamp.now(),
+          cancelReason: "Ride cancelled by driver"
         });
       });
 
-      // Wait for all booking cancellations to complete
-      await Promise.all(cancelPromises);
+      // Cancel the ride itself
+      batch.update(rideRef, { 
+        status: "cancelled",
+        availableSeats: rideData.totalSeats // Reset seats
+      });
 
-      // Cancel the ride
-      await updateDoc(rideRef, { status: "cancelled" });
+      // Commit all changes atomically
+      await batch.commit();
 
       return { rideId };
     },

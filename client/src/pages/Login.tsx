@@ -76,7 +76,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF9F4] flex flex-col p-6 font-sans">
+    <div className="min-h-screen bg-[#FAF9F4] flex flex-col p-6">
       <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
         
         <div className="mb-16">
@@ -85,7 +85,7 @@ export default function Login() {
                 <Car size={24} className="text-[#15803D]" />
              </div>
              <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">OFFICE<span className="text-[#15803D]">MATES</span></h1>
+                <h1 className="text-2xl font-black text-slate-900 tracking-tighter leading-none">OFFICE<span className="text-[#15803D]">RIDES</span></h1>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Premium Corporate Commuting</p>
              </div>
           </div>
