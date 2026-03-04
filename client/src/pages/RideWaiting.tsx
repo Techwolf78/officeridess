@@ -3,8 +3,8 @@ import { useRideStatus } from "@/hooks/use-ride-status";
 import { useBookingRealtime } from "@/hooks/use-booking-realtime";
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useRoute, useLocation } from "wouter";
-import { MapPin, Clock, Phone, MessageCircle, AlertCircle, ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
-import { useState, useEffect } from "react";
+import { MapPin, Clock, Phone, MessageCircle, AlertCircle, ArrowLeft, Loader2, AlertTriangle, ShieldCheck } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +28,14 @@ export default function RideWaiting() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState("change_of_plans");
   const [isCancelling, setIsCancelling] = useState(false);
+  
+  // Calculate if passenger can manually start (e.g. 5 minutes after scheduled time)
+  const canPassengerStart = useMemo(() => {
+    if (!booking?.ride?.departureTime) return false;
+    const departure = new Date(booking.ride.departureTime);
+    const fiveMinutesAfter = new Date(departure.getTime() + 5 * 60 * 1000);
+    return new Date() > fiveMinutesAfter;
+  }, [booking?.ride?.departureTime]);
 
   // Auto-redirect when ride starts
   useEffect(() => {
@@ -266,6 +274,26 @@ export default function RideWaiting() {
                   <div className="w-3 h-3 bg-primary rounded-full"></div>
                 </div>
               </div>
+
+              {/* Emergency Override for Passenger */}
+              {canPassengerStart && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                    <p className="text-sm text-amber-800">
+                      <strong>Driver phone issues?</strong> If you're already in the car but the driver can't start the ride, you can start it yourself now.
+                    </p>
+                  </div>
+                  <button
+                    onClick={startRide}
+                    disabled={isUpdating}
+                    className="w-full py-2 bg-amber-600 text-white font-semibold rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center gap-2 text-sm"
+                  >
+                    <ShieldCheck size={18} />
+                    {isUpdating ? "Starting..." : "Start Ride Now (Passenger Override)"}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

@@ -48,7 +48,7 @@ class ErrorBoundary extends Component<Props, State> {
               <div className="space-y-3 mb-6">
                 <h2 className="text-2xl font-bold text-slate-900">Service Temporarily Unavailable</h2>
                 <p className="text-slate-600 leading-relaxed max-w-md mx-auto text-sm">
-                  We're experiencing a technical issue with OFFICERIDES.
+                  We're experiencing a technical issue with <span className="text-black">OFFICE</span><span className="text-[#15803D]">RIDES</span>.
                   Our IT team has been notified and is working to restore service quickly.
                 </p>
                 <p className="text-slate-500 text-xs">

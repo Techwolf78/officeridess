@@ -75,7 +75,7 @@ export default function Register() {
       onSuccess: () => {
         localStorage.removeItem('registration_step1'); // Clean up
         toast({
-          title: "Welcome to OFFICERIDES!",
+          title: "Welcome to OFFICE RIDES!",
           description: "Your profile has been set up successfully.",
         });
         // Navigation will happen automatically when user state updates

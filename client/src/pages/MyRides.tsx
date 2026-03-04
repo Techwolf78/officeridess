@@ -1,13 +1,13 @@
 import { Layout } from "@/components/ui/Layout";
 import { useAuth } from "@/hooks/use-auth";
-import { useBookingsRealtime } from "@/hooks/use-bookings-realtime";
+import { useBookingsRealtime } from "@/hooks/use-booking-realtime";
 import { useRidesRealtime } from "@/hooks/use-rides-realtime";
 import { useCancelBooking } from "@/hooks/use-bookings";
 import { useCancelRide } from "@/hooks/use-rides";
 import { RideCard } from "@/components/RideCard";
 import { RideCardSkeleton } from "@/components/RideCardSkeleton";
 import { BookingCardSkeleton } from "@/components/BookingCardSkeleton";
-import { Loader2, Ticket, Calendar, Star } from "lucide-react";
+import { Loader2, Ticket, Calendar, Star, ChevronUp, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -36,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 export default function MyRides() {
   const { user } = useAuth();
@@ -44,24 +44,23 @@ export default function MyRides() {
   const isDriver = user?.role === 'driver';
   const { toast } = useToast();
   const [cancelRideId, setCancelRideId] = useState<string | null>(null);
+  // sorting preferences for passenger bookings
+  const [sortAsc, setSortAsc] = useState(false); // false = newest first, true = oldest first
   const [cancelBookingData, setCancelBookingData] = useState<{ bookingId: string; rideTitle: string } | null>(null);
   const [cancelReason, setCancelReason] = useState<string>("");
-  const [isSyncing, setIsSyncing] = useState(false);
 
   // Always call hooks at the top level
   const { rides, loading: ridesLoading } = useRidesRealtime(isDriver ? { driverId: user?.uid, includeCancelled: true } : undefined);
   const { bookings, loading: bookingsLoading } = useBookingsRealtime();
 
-  // Simple sync indicator logic
-  useEffect(() => {
-    if (!ridesLoading && !bookingsLoading) {
-      const interval = setInterval(() => {
-        setIsSyncing(true);
-        setTimeout(() => setIsSyncing(false), 1000);
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [ridesLoading, bookingsLoading]);
+  // apply sort order to bookings for display
+  const sortedBookings = useMemo(() => {
+    return [...bookings].sort((a, b) => {
+      const aTime = a.bookingTime?.getTime() ?? 0;
+      const bTime = b.bookingTime?.getTime() ?? 0;
+      return sortAsc ? aTime - bTime : bTime - aTime;
+    });
+  }, [bookings, sortAsc]);
   const cancelRide = useCancelRide();
   const cancelBooking = useCancelBooking();
 
@@ -127,15 +126,9 @@ export default function MyRides() {
     return (
       <Layout headerTitle="My Posted Rides" showNav={true}>
         <div className="px-4 py-6">
-          <div className="flex justify-between items-center mb-4">
-             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Active Rides</h2>
-             {isSyncing && (
-                <div className="flex items-center gap-1.5 py-1 px-2 bg-secondary/50 rounded-full animate-pulse">
-                  <Loader2 className="w-3 h-3 animate-spin text-orange-500" />
-                  <span className="text-[10px] font-medium text-orange-700">Syncing...</span>
-                </div>
-             )}
-          </div>
+          <div className="mb-4">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Active Rides</h2>
+        </div>
 
           {ridesLoading && rides.length === 0 ? (
             <div className="space-y-4">
@@ -197,14 +190,16 @@ export default function MyRides() {
   return (
     <Layout headerTitle="My Bookings" showNav={true}>
       <div className="px-4 py-6">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Your Trips</h2>
-          {isSyncing && (
-            <div className="flex items-center gap-1.5 py-1 px-2 bg-secondary/50 rounded-full animate-pulse">
-              <Loader2 className="w-3 h-3 animate-spin text-orange-500" />
-              <span className="text-[10px] font-medium text-orange-700">Syncing...</span>
-            </div>
-          )}
+          {/* sort control for passengers */}
+          <button
+            type="button"
+            onClick={() => setSortAsc(prev => !prev)}
+            className="text-xs flex items-center gap-1 text-primary hover:underline"
+          >
+            {sortAsc ? <><ChevronDown size={14} /> Oldest first</> : <><ChevronUp size={14} /> Newest first</>}
+          </button>
         </div>
 
         {bookingsLoading && bookings.length === 0 ? (
@@ -213,9 +208,9 @@ export default function MyRides() {
             <BookingCardSkeleton />
             <BookingCardSkeleton />
           </div>
-        ) : bookings && bookings.length > 0 ? (
+        ) : sortedBookings && sortedBookings.length > 0 ? (
           <div className="space-y-4">
-            {bookings.map(booking => (
+            {sortedBookings.map(booking => (
               <div key={booking.id} className="bg-white rounded-2xl p-5 shadow-sm border border-border/50">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-primary">

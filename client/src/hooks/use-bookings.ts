@@ -4,7 +4,7 @@ import {
   query,
   where,
   getDocs,
-  addDoc,
+  runTransaction,
   updateDoc,
   doc,
   getDoc,
@@ -64,6 +64,8 @@ export function useBookings() {
             routePolyline: rideDoc.data().routePolyline || "",
             routeSteps: rideDoc.data().routeSteps || [],
             routeRoads: rideDoc.data().routeRoads || [],
+            vehicleComfort: rideDoc.data().vehicleComfort,
+            instantBooking: rideDoc.data().instantBooking,
           } : undefined,
         });
       }
@@ -82,70 +84,72 @@ export function useCreateBooking() {
     mutationFn: async (data: CreateBookingRequest) => {
       if (!user) throw new Error("Not authenticated");
 
-      // Get ride document to check availability
-      const rideRef = doc(db, "rides", data.rideId);
-      const rideSnap = await getDoc(rideRef);
+      // Use a transaction to ensure atomic seat booking
+      const newBookingId = await runTransaction(db, async (transaction) => {
+        const rideRef = doc(db, "rides", data.rideId);
+        const rideSnap = await transaction.get(rideRef);
 
-      if (!rideSnap.exists()) {
-        throw new Error("Ride not found");
-      }
+        if (!rideSnap.exists()) {
+          throw new Error("Ride not found");
+        }
 
-      const rideData = rideSnap.data();
+        const rideData = rideSnap.data();
 
-      // 🚫 PREVENT DRIVERS FROM BOOKING THEIR OWN RIDES
-      if (rideData.driverId === user.uid) {
-        throw new Error("You cannot book your own ride");
-      }
+        // 🚫 PREVENT DRIVERS FROM BOOKING THEIR OWN RIDES
+        if (rideData.driverId === user.uid) {
+          throw new Error("You cannot book your own ride");
+        }
 
-      // 🚫 PREVENT DUPLICATE BOOKINGS - Check if user already booked this ride
-      const existingBookingsQuery = query(
-        collection(db, "bookings"),
-        where("rideId", "==", data.rideId),
-        where("passengerId", "==", user.uid),
-        where("status", "in", ["confirmed", "completed"])
-      );
-      const existingBookings = await getDocs(existingBookingsQuery);
-      if (!existingBookings.empty) {
-        throw new Error("You have already booked this ride");
-      }
+        // 🚫 PREVENT DUPLICATE BOOKINGS - Check if user already booked this ride
+        // Using a deterministic ID ensures uniqueness and allows transactional verification.
+        const bookingId = `${data.rideId}_${user.uid}`;
+        const bookingRef = doc(db, "bookings", bookingId);
+        const existingBooking = await transaction.get(bookingRef);
+        
+        if (existingBooking.exists() && ["confirmed", "completed"].includes(existingBooking.data().status)) {
+          throw new Error("You have already booked this ride");
+        }
 
-      // ✅ VALIDATE SEAT AVAILABILITY
-      if (rideData.availableSeats < data.seats) {
-        throw new Error(`Only ${rideData.availableSeats} seats available`);
-      }
+        // ✅ VALIDATE SEAT AVAILABILITY
+        if (rideData.availableSeats < data.seats) {
+          throw new Error(`Only ${rideData.availableSeats} seats available`);
+        }
 
-      // ✅ VALIDATE RIDE STATUS
-      if (rideData.status !== "scheduled") {
-        throw new Error("This ride is no longer available for booking");
-      }
+        // ✅ VALIDATE RIDE STATUS
+        if (rideData.status !== "scheduled") {
+          throw new Error("This ride is no longer available for booking");
+        }
 
-      // ✅ VALIDATE BOOKING TIME - Prevent last-minute bookings
-      const rideTime = rideData.departureTime.toDate();
-      const now = new Date();
-      const minutesUntilRide = (rideTime.getTime() - now.getTime()) / (1000 * 60);
-      if (minutesUntilRide < 2) {
-        throw new Error("Cannot book rides less than 2 minutes before departure");
-      }
+        // ✅ VALIDATE BOOKING TIME - Prevent last-minute bookings (threshold increased for reliability)
+        const rideTime = rideData.departureTime.toDate();
+        const now = new Date();
+        const minutesUntilRide = (rideTime.getTime() - now.getTime()) / (1000 * 60);
+        if (minutesUntilRide < 15) {
+          throw new Error("Cannot book rides less than 15 minutes before departure");
+        }
 
-      // Create booking
-      const totalPrice = rideData.pricePerSeat * data.seats;
-      const bookingData = {
-        rideId: data.rideId,
-        passengerId: user.uid,
-        seatsBooked: data.seats,
-        totalPrice: totalPrice,
-        status: "confirmed",
-        bookingTime: Timestamp.fromDate(new Date()),
-      };
+        // Create booking data
+        const totalPrice = rideData.pricePerSeat * data.seats;
+        const bookingData = {
+          rideId: data.rideId,
+          passengerId: user.uid,
+          seatsBooked: data.seats,
+          totalPrice: totalPrice,
+          status: "confirmed",
+          bookingTime: Timestamp.fromDate(new Date()),
+        };
 
-      const bookingRef = await addDoc(collection(db, "bookings"), bookingData);
+        transaction.set(bookingRef, bookingData);
 
-      // Update ride available seats
-      await updateDoc(rideRef, {
-        availableSeats: rideData.availableSeats - data.seats,
+        // Update ride available seats
+        transaction.update(rideRef, {
+          availableSeats: rideData.availableSeats - data.seats,
+        });
+
+        return bookingRef.id;
       });
 
-      return { id: bookingRef.id, ...bookingData };
+      return { id: newBookingId };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });

@@ -53,16 +53,19 @@ export default function RideCompletion() {
   };
 
   // Calculate CO2 saved (0.15 kg per km)
-  const co2Saved = booking?.ride?.distance ? (booking.ride.distance * 0.15).toFixed(1) : "0.0";
+  // Use booking.co2SavedKg if available (calculated on server/at completion), 
+  // otherwise fallback to client calculation
+  const co2SavedValue = booking?.co2SavedKg || (booking?.ride?.distance ? booking.ride.distance * 0.15 : 0);
+  const co2Saved = Number(co2SavedValue).toFixed(1);
   const distance = booking?.ride?.distance?.toFixed(1) || "0.0";
-  const duration = booking?.ride?.eta || 0;
+  const duration = booking?.ride?.eta ? Math.round(booking.ride.eta) : 0;
   const rideName = isDriver ? booking?.passenger?.firstName : booking?.ride?.driver?.firstName;
 
   if (loading) {
     return (
       <Layout headerTitle="Completing Trip" showNav={false}>
         <div className="flex flex-col items-center justify-center min-h-[80vh] px-4">
-          <Loader2 className="animate-spin text-orange-500 w-12 h-12" />
+          <Loader2 className="animate-spin text-green-600 w-12 h-12" />
           <p className="mt-6 text-lg font-bold text-slate-900 tracking-tight">Finalizing your achievement...</p>
         </div>
       </Layout>
@@ -71,7 +74,7 @@ export default function RideCompletion() {
 
   return (
     <Layout headerTitle="Journey Complete" showNav={false}>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50 pb-40 overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-green-50 pb-40 overflow-hidden">
         {/* Animated confetti background */}
         {showConfetti && (
           <div className="fixed inset-0 pointer-events-none">
@@ -120,15 +123,15 @@ export default function RideCompletion() {
             className="relative w-32 h-32 mx-auto mb-8"
             style={{ animation: 'scaleInBounce 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
           >
-            <div className="absolute inset-0 bg-orange-100/40 rounded-full animate-pulse blur-2xl"></div>
-            <div className="relative w-32 h-32 bg-gradient-to-br from-orange-400 to-orange-500 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl shadow-orange-400/30 border-4 border-white">
+            <div className="absolute inset-0 bg-green-100/40 rounded-full animate-pulse blur-2xl"></div>
+            <div className="relative w-32 h-32 bg-gradient-to-br from-green-500 to-green-600 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl shadow-green-500/30 border-4 border-white">
               <Trophy size={64} className="drop-shadow-lg" />
             </div>
           </div>
           
           <h1 className="text-5xl font-black text-slate-900 tracking-tighter mb-3">Destination Reached!</h1>
           <p className="text-lg text-slate-500 font-medium">
-            Great job completing your commute with <span className="text-orange-600 font-bold">{rideName}</span>
+            Great job completing your commute with <span className="text-green-700 font-bold">{rideName}</span>
           </p>
         </div>
 
@@ -186,8 +189,8 @@ export default function RideCompletion() {
             {/* Route Info */}
             <div className="space-y-3 pt-2 border-t border-slate-100">
               <div className="flex gap-3">
-                <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-5 h-5 text-orange-600" />
+                <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-5 h-5 text-green-700" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-10px font-bold text-slate-400 uppercase tracking-widest">From</p>
@@ -214,7 +217,7 @@ export default function RideCompletion() {
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-orange-400 to-orange-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-md">
+                <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-md">
                   {rideName?.[0] || "?"}
                 </div>
                 <div>
@@ -222,9 +225,9 @@ export default function RideCompletion() {
                   <p className="text-lg font-black text-slate-900">{rideName || "Unknown"}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 bg-orange-50 px-3 py-2 rounded-full border border-orange-200">
-                <Star className="w-4 h-4 text-orange-500 fill-orange-500" />
-                <span className="text-xs font-bold text-orange-600">Verified</span>
+              <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-full border border-green-200">
+                <Star className="w-4 h-4 text-green-600 fill-green-600" />
+                <span className="text-xs font-bold text-green-700">Verified</span>
               </div>
             </div>
           </div>
@@ -232,13 +235,13 @@ export default function RideCompletion() {
           {/* Confirmation Card for Passengers */}
           {!isDriver && !confirmed && (
             <div 
-              className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-[2.5rem] p-6 text-white shadow-xl shadow-orange-500/30 border border-orange-400"
+              className="bg-gradient-to-br from-green-600 to-green-700 rounded-[2.5rem] p-6 text-white shadow-xl shadow-green-600/30 border border-green-500"
               style={{ animation: 'slideUp 0.6s ease-out 0.5s both' }}
             >
               <div className="text-center space-y-4">
                 <p className="text-sm font-bold uppercase tracking-widest opacity-90">✓ Final Step</p>
                 <h3 className="text-2xl font-black">Confirm Arrival</h3>
-                <p className="text-sm text-orange-100">Please confirm you've reached your destination</p>
+                <p className="text-sm text-green-100">Please confirm you've reached your destination</p>
                 
                 <div className="flex gap-3 pt-2">
                   <button 
@@ -281,7 +284,7 @@ export default function RideCompletion() {
           <div className="max-w-md mx-auto px-4">
             {(isDriver || confirmed) && (
               <Link href={`/ride/${bookingId}/rating`}>
-                <button className="w-full h-16 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-[1.5rem] font-black text-lg shadow-xl shadow-orange-500/30 active:scale-95 transition-all flex items-center justify-center gap-3 border border-orange-400">
+                <button className="w-full h-16 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-[1.5rem] font-black text-lg shadow-xl shadow-green-600/30 active:scale-95 transition-all flex items-center justify-center gap-3 border border-green-500">
                   <Star size={24} className="fill-white" />
                   Rate Your Experience
                 </button>
