@@ -6,7 +6,8 @@ import {
   onSnapshot,
   Timestamp,
   doc,
-  writeBatch
+  writeBatch,
+  getDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
@@ -78,13 +79,34 @@ export function useBookingsRealtime() {
       
       const unsubscribe = onSnapshot(
         q,
-        (querySnapshot) => {
+        async (querySnapshot) => {
           const bookingsData: FirebaseBooking[] = [];
+          
+          // Use a batch of promises to fetch ride data for all bookings
+          const bookingPromises = querySnapshot.docs.map(async (docSnap) => {
+            const bookingData = docSnap.data();
+            let ride = bookingData.ride;
+            
+            // If ride data is missing, fetch it
+            if (!ride && bookingData.rideId) {
+              try {
+                const rideDoc = await getDoc(doc(db, "rides", bookingData.rideId));
+                if (rideDoc.exists()) {
+                  const rData = rideDoc.data();
+                  ride = {
+                    id: rideDoc.id,
+                    ...rData,
+                    departureTime: rData.departureTime instanceof Timestamp ? rData.departureTime.toDate() : new Date(rData.departureTime),
+                    createdAt: rData.createdAt instanceof Timestamp ? rData.createdAt.toDate() : new Date(rData.createdAt),
+                  };
+                }
+              } catch (err) {
+                console.error("Error fetching ride for booking:", docSnap.id, err);
+              }
+            }
 
-          querySnapshot.forEach((doc) => {
-            const bookingData = doc.data();
-            bookingsData.push({
-              id: doc.id,
+            return {
+              id: docSnap.id,
               rideId: bookingData.rideId,
               passengerId: bookingData.passengerId,
               seatsBooked: bookingData.seatsBooked,
@@ -100,13 +122,16 @@ export function useBookingsRealtime() {
               timeBeforeDeparture: bookingData.timeBeforeDeparture,
               passengerRating: bookingData.passengerRating,
               driverRating: bookingData.driverRating,
-            });
+              ride,
+            };
           });
 
-          const currentString = JSON.stringify(bookingsData);
+          const resolvedBookings = await Promise.all(bookingPromises);
+
+          const currentString = JSON.stringify(resolvedBookings);
           if (currentString !== lastUpdateRef.current) {
             lastUpdateRef.current = currentString;
-            setBookings(bookingsData);
+            setBookings(resolvedBookings);
             if (typeof window !== "undefined" && user?.uid) {
               const cacheKey = `bookings_cache_${user.uid}`;
               localStorage.setItem(cacheKey, currentString);

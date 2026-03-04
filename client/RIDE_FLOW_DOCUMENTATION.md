@@ -3,7 +3,7 @@
 This document provides an in-depth technical reference for the ride‑sharing client application. The app is designed more like **BlaBlaCar** than a taxi/dispatch service – it targets a niche of office commuters sharing journeys, not on‑demand hailing. Because we cater to scheduled, long‑distance (often daily) rides rather than instant requests, the code prioritises simplicity and relies on passengers and drivers coordinating via the app. This context explains many of the architectural choices below. The document covers passenger and driver interactions, data model, architecture, the full lifecycle of a ride, and the various client‑side mechanisms that handle scheduled bookings.
 
 ## 🕒 The "Booking Time Arrived" Logic
-**CRITICAL NOTE:** There is currently **no automated logic** (client-side or server-side) that triggers a status change exactly when the clock reaches `bookingTime` or `departureTime`. All state transitions are manual or reactive to database changes.
+Automated status changes (like auto-cancelling "zombie" bookings 12 hours after departure) and proactive notifications (15 minutes before departure) are handled client-side by the `BackgroundManager` component. Other state transitions like "Start Ride" or "Complete Ride" remain manual actions for the driver or passenger.
 
 ---
 
@@ -398,10 +398,10 @@ Below is a detailed description of every custom hook and key component in the ri
 
 ## 🏗️ Architectural Decisions & Known Limitations
 
-The following items are not "bugs" but intentional design choices to keep the application **free, serverless, and niche-focused** (office commuters). As the app lacks Cloud Functions, several automated behaviors are simulated via client-side logic.
+The following items are not "bugs" but intentional design choices to keep the application **free, serverless, and niche-focused** (office commuters). As the app lacks Cloud Functions, automated behaviors are implemented via client-side logic and the `BackgroundManager`.
 
 1.  **No Automatic Dispatch:** Unlike Uber/Lyft, there is no "Search for Driver" automation. Bookings are confirmed immediately upon passenger request if seats are available, fitting the **BlaBlaCar** model.
-2.  **No Proactive Notifications:** The app does not currently send push notifications. Users are expected to monitor the `waiting` and `tracking` screens for real-time status updates.
+2.  **Limited Proactive Notifications (No OS Push):** The app does not use OS-level push notifications. Time-based reminders and status nudges are handled client-side (via in-app UI and the `BackgroundManager`) and only work while the app is running.
 3.  **Manual Start/Arrival:** A ride will stay in `confirmed` status indefinitely unless the driver manually marks arrival or the passenger uses the **Override** feature.
 4.  **Partial Offline Support:** While `useConnectionStatus` shows banners, there is no robust queue for critical updates like `markCompletedWithCO2`. Connectivity is required for state transitions.
 5.  **Text-Based Search:** Search relies on exact string matches for origin/destination, which suits fixed office routes better than variable pickup points.

@@ -1,6 +1,6 @@
 import { Layout } from "@/components/ui/Layout";
 import { useAuth } from "@/hooks/use-auth";
-import { useBookingsRealtime } from "@/hooks/use-bookings-realtime";
+import { useBookingsRealtime } from "@/hooks/use-booking-realtime";
 import { useRidesRealtime } from "@/hooks/use-rides-realtime";
 import { useCancelBooking } from "@/hooks/use-bookings";
 import { useCancelRide } from "@/hooks/use-rides";

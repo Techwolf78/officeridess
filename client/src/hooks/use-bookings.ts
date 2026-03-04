@@ -5,7 +5,6 @@ import {
   where,
   getDocs,
   runTransaction,
-  addDoc,
   updateDoc,
   doc,
   getDoc,
@@ -102,17 +101,12 @@ export function useCreateBooking() {
         }
 
         // 🚫 PREVENT DUPLICATE BOOKINGS - Check if user already booked this ride
-        // Note: Transactions require reads before writes. Querying is allowed but cannot be 
-        // part of the transaction's atomic snapshot itself in the same way docs are.
-        // However, we verify duplicate bookings beforehand or keep it as is.
-        const existingBookingsQuery = query(
-          collection(db, "bookings"),
-          where("rideId", "==", data.rideId),
-          where("passengerId", "==", user.uid),
-          where("status", "in", ["confirmed", "completed"])
-        );
-        const existingBookings = await getDocs(existingBookingsQuery);
-        if (!existingBookings.empty) {
+        // Using a deterministic ID ensures uniqueness and allows transactional verification.
+        const bookingId = `${data.rideId}_${user.uid}`;
+        const bookingRef = doc(db, "bookings", bookingId);
+        const existingBooking = await transaction.get(bookingRef);
+        
+        if (existingBooking.exists() && ["confirmed", "completed"].includes(existingBooking.data().status)) {
           throw new Error("You have already booked this ride");
         }
 
@@ -145,7 +139,6 @@ export function useCreateBooking() {
           bookingTime: Timestamp.fromDate(new Date()),
         };
 
-        const bookingRef = doc(collection(db, "bookings"));
         transaction.set(bookingRef, bookingData);
 
         // Update ride available seats

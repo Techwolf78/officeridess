@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useBookingsRealtime } from "@/hooks/use-bookings-realtime";
+import { useBookingsRealtime } from "@/hooks/use-booking-realtime";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { doc, writeBatch, Timestamp } from "firebase/firestore";
@@ -37,13 +37,13 @@ export function BackgroundManager() {
         const timeDiffMs = departureTime.getTime() - now.getTime();
         const minutesUntilDeparture = timeDiffMs / (1000 * 60);
 
-        // A. Booking Status Cleanup (Zombie Cleanup - 12h old)
-        const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
-        if (new Date(booking.bookingTime) < twelveHoursAgo) {
+        // A. Booking Status Cleanup (Zombie Cleanup - 12h after departure)
+        const departureTimePlusGrace = new Date(departureTime.getTime() + 12 * 60 * 60 * 1000);
+        if (departureTimePlusGrace < now) {
           const ref = doc(db, "bookings", booking.id);
           batch.update(ref, {
             status: "cancelled",
-            cancelReason: "System auto-cleanup: Ride expired",
+            cancelReason: "Auto-cleanup: 12h past departure",
             cancelledAt: Timestamp.now(),
           });
           needsBatchCommit = true;

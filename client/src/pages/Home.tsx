@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRidesRealtime } from "@/hooks/use-rides-realtime";
 import { useDriverRidesRealtime } from "@/hooks/use-driver-rides-realtime";
 import { useBookings } from "@/hooks/use-bookings";
-import { useBookingsRealtime } from "@/hooks/use-bookings-realtime";
+import { useBookingsRealtime } from "@/hooks/use-booking-realtime";
 import { RideCard } from "@/components/RideCard";
 import { RideCardSkeleton } from "@/components/RideCardSkeleton";
 import { Loader2, MapPin, Calendar, Search, Star, TrendingUp, CheckCircle2, Zap, Wallet, BarChart3 } from "lucide-react";

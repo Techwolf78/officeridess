@@ -3,15 +3,15 @@ import {
   doc,
   onSnapshot,
   Timestamp,
-  getDoc,
-  DocumentSnapshot
+  getDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FirebaseRide, FirebaseUser, FirebaseVehicle } from "@/lib/types";
 
 // Cache for driver and vehicle data to prevent duplicate fetches
-const driverCache = new Map<string, FirebaseUser>();
-const vehicleCache = new Map<string, FirebaseVehicle>();
+const driverCache = new Map<string, { data: FirebaseUser; timestamp: number }>();
+const vehicleCache = new Map<string, { data: FirebaseVehicle; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes TTL
 
 export function useRideRealtime(rideId: string) {
   const [ride, setRide] = useState<FirebaseRide | null>(null);
@@ -45,11 +45,14 @@ export function useRideRealtime(rideId: string) {
 
           const data = docSnap.data();
           
+          const now = Date.now();
+          
           // Fetch driver data (from cache if available)
           let driverData: FirebaseUser | undefined;
           if (data.driverId) {
-            if (driverCache.has(data.driverId)) {
-              driverData = driverCache.get(data.driverId);
+            const cached = driverCache.get(data.driverId);
+            if (cached && now - cached.timestamp < CACHE_TTL) {
+              driverData = cached.data;
             } else if (!fetchingRef.current.driverId) {
               // Only fetch if not already fetching
               fetchingRef.current.driverId = data.driverId;
@@ -76,8 +79,12 @@ export function useRideRealtime(rideId: string) {
                     rating: driver.rating,
                     totalRides: driver.totalRides,
                     verified: driver.verified,
-                  };
-                  driverCache.set(data.driverId, driverData);
+                    role: driver.role || "passenger",
+                    isDriverVerified: driver.isDriverVerified || false,
+                  } as FirebaseUser;
+                  if (driverData) {
+                    driverCache.set(data.driverId, { data: driverData, timestamp: now });
+                  }
                 }
               } catch (err) {
                 console.error("Error fetching driver data:", err);
@@ -90,8 +97,9 @@ export function useRideRealtime(rideId: string) {
           // Fetch vehicle data (from cache if available)
           let vehicleData: FirebaseVehicle | undefined;
           if (data.vehicleId) {
-            if (vehicleCache.has(data.vehicleId)) {
-              vehicleData = vehicleCache.get(data.vehicleId);
+            const cached = vehicleCache.get(data.vehicleId);
+            if (cached && now - cached.timestamp < CACHE_TTL) {
+              vehicleData = cached.data;
             } else if (!fetchingRef.current.vehicleId) {
               // Only fetch if not already fetching
               fetchingRef.current.vehicleId = data.vehicleId;
@@ -108,7 +116,7 @@ export function useRideRealtime(rideId: string) {
                     capacity: vehicle.capacity,
                     type: vehicle.type,
                   };
-                  vehicleCache.set(data.vehicleId, vehicleData);
+                  vehicleCache.set(data.vehicleId, { data: vehicleData, timestamp: now });
                 }
               } catch (err) {
                 console.error("Error fetching vehicle data:", err);
@@ -142,6 +150,8 @@ export function useRideRealtime(rideId: string) {
             eta: data.eta || 0,
             originDisplayName: data.originDisplayName,
             destDisplayName: data.destDisplayName,
+            vehicleComfort: data.vehicleComfort || 'basic',
+            instantBooking: data.instantBooking || false,
             // Populated fields
             driver: driverData,
             vehicle: vehicleData,
