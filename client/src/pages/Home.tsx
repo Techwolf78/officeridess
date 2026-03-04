@@ -114,17 +114,22 @@ export default function Home() {
 
   const stats = isDriver ? [
     { label: "Offered", value: user?.totalRides || 0, icon: MapPin, color: "text-blue-500", bg: "bg-blue-50" },
-    { label: "Rating", value: user?.averageRating?.toFixed(1) || "5.0", icon: Star, color: "text-amber-500", bg: "bg-amber-50" },
+    { label: "Rating", value: user?.averageRating ? user.averageRating.toFixed(1) : "—", icon: Star, color: "text-amber-500", bg: "bg-amber-50" },
     { label: "CO2 Saved", value: `${(user?.co2SavedByPassengers || 0).toFixed(1)}kg`, icon: Zap, color: "text-emerald-500", bg: "bg-emerald-50" },
   ] : [
     { label: "Rides", value: user?.totalRides || 0, icon: MapPin, color: "text-primary", bg: "bg-green-50" },
-    { label: "Rating", value: user?.averageRating?.toFixed(1) || "5.0", icon: Star, color: "text-amber-500", bg: "bg-amber-50" },
+    { label: "Rating", value: user?.averageRating ? user.averageRating.toFixed(1) : "—", icon: Star, color: "text-amber-500", bg: "bg-amber-50" },
     { label: "CO2 Saved", value: `${(user?.co2SavedAsPassenger || 0).toFixed(1)}kg`, icon: Zap, color: "text-emerald-500", bg: "bg-emerald-50" },
   ];
 
   return (
     <Layout
-      headerTitle="OFFICERIDES"
+      headerTitle={
+        <div className="flex items-center gap-1">
+          <span className="text-black">OFFICE</span>
+          <span className="text-[#15803D]">RIDES</span>
+        </div>
+      }
       headerExtra={
         <div className="relative pb-12 pt-2">
           <div className="mb-2">
@@ -144,7 +149,7 @@ export default function Home() {
                  <div className={`${stat.bg} w-10 h-10 rounded-2xl flex items-center justify-center mb-1.5 shadow-sm group-hover:rotate-12 transition-transform`}>
                    <stat.icon className={stat.color} size={18} strokeWidth={2.5} />
                  </div>
-                 <span className="text-[15px] font-black text-slate-800 tracking-tight leading-none">
+                 <span className={`text-[15px] font-black tracking-tight leading-none ${stat.value === '—' ? 'text-slate-300' : 'text-slate-800'}`}>
                    {stat.value}
                  </span>
                  <span className="text-[9px] text-slate-400 uppercase font-black tracking-widest mt-1.5 opacity-80">

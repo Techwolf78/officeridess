@@ -1,17 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   doc,
   onSnapshot,
   Timestamp,
-  getDoc
+  getDoc,
+  DocumentSnapshot
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FirebaseRide, FirebaseUser, FirebaseVehicle } from "@/lib/types";
+
+// Cache for driver and vehicle data to prevent duplicate fetches
+const driverCache = new Map<string, FirebaseUser>();
+const vehicleCache = new Map<string, FirebaseVehicle>();
 
 export function useRideRealtime(rideId: string) {
   const [ride, setRide] = useState<FirebaseRide | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const fetchingRef = useRef<{ driverId?: string; vehicleId?: string }>({});
 
   useEffect(() => {
     if (!db || !rideId) {
@@ -39,58 +45,76 @@ export function useRideRealtime(rideId: string) {
 
           const data = docSnap.data();
           
-          // Fetch driver data
+          // Fetch driver data (from cache if available)
           let driverData: FirebaseUser | undefined;
           if (data.driverId) {
-            try {
-              const driverDoc = await getDoc(doc(db, "users", data.driverId));
-              if (driverDoc.exists()) {
-                const driver = driverDoc.data();
-                // Split displayName into firstName and lastName if available
-                const nameParts = driver.displayName ? driver.displayName.split(' ') : [];
-                const firstName = nameParts[0] || '';
-                const lastName = nameParts.slice(1).join(' ') || '';
-                
-                driverData = {
-                  uid: driverDoc.id,
-                  phoneNumber: driver.phoneNumber,
-                  firstName: driver.firstName || firstName,
-                  lastName: driver.lastName || lastName,
-                  displayName: driver.displayName,
-                  email: driver.email,
-                  homeAddress: driver.homeAddress,
-                  officeAddress: driver.officeAddress,
-                  profilePicture: driver.profilePicture,
-                  createdAt: driver.createdAt instanceof Timestamp ? driver.createdAt.toDate() : new Date(driver.createdAt),
-                  rating: driver.rating,
-                  totalRides: driver.totalRides,
-                  verified: driver.verified,
-                };
+            if (driverCache.has(data.driverId)) {
+              driverData = driverCache.get(data.driverId);
+            } else if (!fetchingRef.current.driverId) {
+              // Only fetch if not already fetching
+              fetchingRef.current.driverId = data.driverId;
+              try {
+                const driverDoc = await getDoc(doc(db, "users", data.driverId));
+                if (driverDoc.exists()) {
+                  const driver = driverDoc.data();
+                  // Split displayName into firstName and lastName if available
+                  const nameParts = driver.displayName ? driver.displayName.split(' ') : [];
+                  const firstName = nameParts[0] || '';
+                  const lastName = nameParts.slice(1).join(' ') || '';
+                  
+                  driverData = {
+                    uid: driverDoc.id,
+                    phoneNumber: driver.phoneNumber,
+                    firstName: driver.firstName || firstName,
+                    lastName: driver.lastName || lastName,
+                    displayName: driver.displayName,
+                    email: driver.email,
+                    homeAddress: driver.homeAddress,
+                    officeAddress: driver.officeAddress,
+                    profilePicture: driver.profilePicture,
+                    createdAt: driver.createdAt instanceof Timestamp ? driver.createdAt.toDate() : new Date(driver.createdAt),
+                    rating: driver.rating,
+                    totalRides: driver.totalRides,
+                    verified: driver.verified,
+                  };
+                  driverCache.set(data.driverId, driverData);
+                }
+              } catch (err) {
+                console.error("Error fetching driver data:", err);
+              } finally {
+                fetchingRef.current.driverId = undefined;
               }
-            } catch (err) {
-              console.error("Error fetching driver data:", err);
             }
           }
 
-          // Fetch vehicle data
+          // Fetch vehicle data (from cache if available)
           let vehicleData: FirebaseVehicle | undefined;
           if (data.vehicleId) {
-            try {
-              const vehicleDoc = await getDoc(doc(db, "vehicles", data.vehicleId));
-              if (vehicleDoc.exists()) {
-                const vehicle = vehicleDoc.data();
-                vehicleData = {
-                  id: vehicleDoc.id,
-                  userId: vehicle.userId,
-                  model: vehicle.model,
-                  plateNumber: vehicle.plateNumber,
-                  color: vehicle.color,
-                  capacity: vehicle.capacity,
-                  type: vehicle.type,
-                };
+            if (vehicleCache.has(data.vehicleId)) {
+              vehicleData = vehicleCache.get(data.vehicleId);
+            } else if (!fetchingRef.current.vehicleId) {
+              // Only fetch if not already fetching
+              fetchingRef.current.vehicleId = data.vehicleId;
+              try {
+                const vehicleDoc = await getDoc(doc(db, "vehicles", data.vehicleId));
+                if (vehicleDoc.exists()) {
+                  const vehicle = vehicleDoc.data();
+                  vehicleData = {
+                    id: vehicleDoc.id,
+                    userId: vehicle.userId,
+                    model: vehicle.model,
+                    plateNumber: vehicle.plateNumber,
+                    color: vehicle.color,
+                    capacity: vehicle.capacity,
+                    type: vehicle.type,
+                  };
+                  vehicleCache.set(data.vehicleId, vehicleData);
+                }
+              } catch (err) {
+                console.error("Error fetching vehicle data:", err);
+              } finally {
+                fetchingRef.current.vehicleId = undefined;
               }
-            } catch (err) {
-              console.error("Error fetching vehicle data:", err);
             }
           }
 

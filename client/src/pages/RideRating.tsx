@@ -89,7 +89,7 @@ export default function RideRating() {
     return (
       <Layout headerTitle="Rate Your Trip" showNav={false}>
         <div className="flex flex-col items-center justify-center min-h-[80vh] px-4">
-          <Loader2 className="animate-spin text-orange-500 w-12 h-12" />
+          <Loader2 className="animate-spin text-green-600 w-12 h-12" />
           <p className="mt-6 text-lg font-bold text-slate-900">Loading...</p>
         </div>
       </Layout>
@@ -99,7 +99,7 @@ export default function RideRating() {
   if (submitted) {
     return (
       <Layout headerTitle="Thank You" showNav={false}>
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50 flex flex-col items-center justify-center px-6 pb-24 text-center">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-green-50 flex flex-col items-center justify-center px-6 pb-24 text-center">
           <style>{`
             @keyframes scaleInBounce {
               0% { transform: scale(0); }
@@ -108,17 +108,17 @@ export default function RideRating() {
             }
           `}</style>
           <div 
-            className="w-24 h-24 bg-gradient-to-br from-orange-400 to-orange-500 rounded-[2.5rem] shadow-2xl shadow-orange-400/30 flex items-center justify-center text-white mb-8 border-4 border-white"
+            className="w-24 h-24 bg-gradient-to-br from-green-500 to-green-600 rounded-[2.5rem] shadow-2xl shadow-green-500/30 flex items-center justify-center text-white mb-8 border-4 border-white"
             style={{ animation: 'scaleInBounce 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
           >
             <CheckCircle2 size={48} />
           </div>
           <h2 className="text-4xl font-black text-slate-900 tracking-tighter mb-3">Feedback Shared!</h2>
           <p className="text-slate-500 font-medium mb-12 max-w-xs mx-auto leading-relaxed">
-            Thank you for helping improve the <span className="text-orange-600 font-bold">Office Commute Mate</span> community with your honest feedback.
+            Thank you for helping improve the <span className="text-green-700 font-bold">Office Commute Mate</span> community with your honest feedback.
           </p>
           <Link href="/rides" className="w-full max-w-sm">
-            <button className="w-full h-16 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-[1.5rem] font-black text-lg shadow-xl shadow-orange-500/30 active:scale-95 transition-all border border-orange-400">
+            <button className="w-full h-16 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-[1.5rem] font-black text-lg shadow-xl shadow-green-600/30 active:scale-95 transition-all border border-green-500">
               Back to Rides
             </button>
           </Link>
@@ -129,7 +129,7 @@ export default function RideRating() {
 
   return (
     <Layout headerTitle="Rate Your Trip" showNav={false}>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50 pb-40">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-green-50 pb-40">
         <style>{`
           @keyframes slideUp {
             from { opacity: 0; transform: translateY(20px); }
@@ -144,12 +144,12 @@ export default function RideRating() {
         {/* Header */}
         <div className="bg-white px-4 pt-6 pb-12 rounded-b-[3rem] shadow-lg border-b border-slate-200/60">
           <div className="flex flex-col items-center text-center">
-            <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-500 rounded-[2rem] flex items-center justify-center mb-6 text-white shadow-lg font-bold text-2xl border-4 border-white">
+            <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-[2rem] flex items-center justify-center mb-6 text-white shadow-lg font-bold text-2xl border-4 border-white">
               {(isDriver ? booking?.passenger?.firstName : booking?.ride?.driver?.firstName)?.[0] || "?"}
             </div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tighter">How Was Your Trip?</h1>
             <p className="text-slate-500 font-medium text-sm mt-2">
-              with <span className="text-orange-600 font-bold">{isDriver ? booking?.passenger?.firstName : booking?.ride?.driver?.firstName}</span>
+              with <span className="text-green-700 font-bold">{isDriver ? booking?.passenger?.firstName : booking?.ride?.driver?.firstName}</span>
             </p>
           </div>
         </div>
@@ -178,7 +178,7 @@ export default function RideRating() {
                       className={cn(
                         "transition-all duration-200 cursor-pointer",
                         isActive
-                          ? "fill-orange-400 text-orange-400 drop-shadow-[0_0_12px_rgba(249,115,22,0.3)]"
+                          ? "fill-green-500 text-green-500 drop-shadow-[0_0_12px_rgba(34,197,94,0.3)]"
                           : "text-slate-200 fill-slate-100"
                       )}
                       style={
@@ -219,8 +219,8 @@ export default function RideRating() {
                       className={cn(
                         "p-4 rounded-2xl border-2 transition-all duration-200 flex flex-col items-center gap-2 group active:scale-95",
                         isSelected
-                          ? "bg-orange-100 border-orange-400 shadow-md"
-                          : "bg-white border-slate-200 hover:border-orange-300 shadow-sm"
+                          ? "bg-green-100 border-green-400 shadow-md"
+                          : "bg-white border-slate-200 hover:border-green-300 shadow-sm"
                       )}
                     >
                       <tag.icon className={cn(
@@ -259,20 +259,7 @@ export default function RideRating() {
             </div>
           )}
 
-          {/* XP Info */}
-          {ratingData.rating === 5 && (
-            <div 
-              className="bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-2xl p-4 flex items-center gap-3"
-              style={{ animation: 'slideUp 0.6s ease-out 0.4s both' }}
-            >
-              <div className="w-10 h-10 rounded-xl bg-orange-200 flex items-center justify-center flex-shrink-0">
-                <Star className="w-5 h-5 text-orange-600 fill-orange-600" />
-              </div>
-              <p className="text-sm font-bold text-orange-900">
-                ✨ Giving a 5-star rating awards your mate <span className="text-lg">+50 XP</span>
-              </p>
-            </div>
-          )}
+
         </div>
 
         {/* Bottom Action */}
