@@ -236,6 +236,17 @@ export default function CreateRide() {
       return;
     }
 
+    // Shield against unverified drivers
+    if (user.verificationStatus !== "verified") {
+      toast({ 
+        title: "Verification Required", 
+        description: "You must complete your identity verification before posting a ride.", 
+        variant: "destructive" 
+      });
+      setLocation("/verification-required");
+      return;
+    }
+
     // Validate route selection
     if (!originLatLng || !destLatLng) {
       console.log('Validation Error: Missing route - originLatLng:', originLatLng, 'destLatLng:', destLatLng);

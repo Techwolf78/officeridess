@@ -73,7 +73,7 @@ export default function Settings() {
 
   return (
     <Layout headerTitle="Settings" showNav={true}>
-      <div className="px-4 py-8 pb-24 max-w-md mx-auto font-sans">
+      <div className="px-4 py-8 pb-24 max-w-md mx-auto">
         {/* Tab Navigation */}
         <div className="flex gap-2 mb-6 bg-secondary rounded-lg p-1">
           <button

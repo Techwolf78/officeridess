@@ -8,7 +8,7 @@ import { useChatRealtime } from "@/hooks/use-chat-realtime";
 interface LayoutProps {
   children: ReactNode;
   showNav?: boolean;
-  headerTitle?: string;
+  headerTitle?: string | ReactNode;
   className?: string;
   // optional extra content that should appear inside the header (e.g. welcome text on home page)
   headerExtra?: ReactNode;

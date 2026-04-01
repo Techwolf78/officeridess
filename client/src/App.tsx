@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/hooks/use-auth.tsx";
 import { Loader2 } from "lucide-react";
 import { LoadScript } from "@react-google-maps/api";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { BackgroundManager } from "@/components/BackgroundManager";
 import { ProtectedRoute, PublicRoute } from "@/components/ProtectedRoute";
 
 import Login from "@/pages/Login";
@@ -73,6 +74,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <BackgroundManager />
         <TooltipProvider>
           <LoadScript 
             googleMapsApiKey={GOOGLE_MAPS_API_KEY} 
